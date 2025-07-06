@@ -31,22 +31,29 @@ class AuthViewModel(
             authRepository.getAuthState().collect { state ->
                 when (state) {
                     is com.example.reciplan.data.auth.AuthState.Authenticated -> {
-                        val user = authRepository.getCurrentUser()
-                        if (user != null) {
-                            _authState.value = AuthResult.Success(
-                                com.example.reciplan.data.model.User(
-                                    id = user.uid,
-                                    email = user.email ?: "",
-                                    name = user.displayName,
-                                    username = null,
-                                    photoUrl = user.photoUrl?.toString(),
-                                    emailVerified = user.isEmailVerified,
-                                    created_at = "",
-                                    updated_at = ""
-                                )
-                            )
+                        // Fetch the actual user data from backend
+                        val userData = authRepository.getCurrentUserData()
+                        if (userData != null) {
+                            _authState.value = AuthResult.Success(userData)
                         } else {
-                            _authState.value = AuthResult.Error("User not authenticated")
+                            // Fallback to Firebase user data if backend data is not available
+                            val firebaseUser = authRepository.getCurrentUser()
+                            if (firebaseUser != null) {
+                                _authState.value = AuthResult.Success(
+                                    com.example.reciplan.data.model.User(
+                                        id = firebaseUser.uid,
+                                        email = firebaseUser.email ?: "",
+                                        name = firebaseUser.displayName,
+                                        username = null,
+                                        photoUrl = firebaseUser.photoUrl?.toString(),
+                                        emailVerified = firebaseUser.isEmailVerified,
+                                        created_at = "",
+                                        updated_at = ""
+                                    )
+                                )
+                            } else {
+                                _authState.value = AuthResult.Error("User not authenticated")
+                            }
                         }
                     }
                     is com.example.reciplan.data.auth.AuthState.Unauthenticated -> {
