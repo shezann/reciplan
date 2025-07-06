@@ -113,6 +113,12 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
+// Image Loading
+implementation(libs.glide)
+
+// UI Components
+implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

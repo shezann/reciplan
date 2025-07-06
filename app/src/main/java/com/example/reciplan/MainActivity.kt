@@ -102,9 +102,10 @@ class ViewModelFactory(private val appContainer: com.example.reciplan.di.AppCont
 @Composable
 fun ReciplanApp() {
     val navController = rememberNavController()
+    val context = LocalContext.current
     
     // Get the app container from the application
-    val application = androidx.compose.ui.platform.LocalContext.current.applicationContext as ReciplanApplication
+    val application = context.applicationContext as ReciplanApplication
     val viewModelFactory = ViewModelFactory(application.appContainer)
     
     NavHost(
@@ -119,9 +120,10 @@ fun ReciplanApp() {
                     }
                 },
                 onNavigateToMain = {
-                    navController.navigate("main") {
-                        popUpTo("splash") { inclusive = true }
-                    }
+                    // Navigate to MainFragmentActivity instead of placeholder
+                    val intent = Intent(context, MainFragmentActivity::class.java)
+                    context.startActivity(intent)
+                    (context as ComponentActivity).finish()
                 },
                 onNavigateToUsername = {
                     navController.navigate("username") {
@@ -135,9 +137,10 @@ fun ReciplanApp() {
         composable("login") {
             LoginScreen(
                 onLoginSuccess = {
-                    navController.navigate("main") {
-                        popUpTo("login") { inclusive = true }
-                    }
+                    // Navigate to MainFragmentActivity instead of placeholder
+                    val intent = Intent(context, MainFragmentActivity::class.java)
+                    context.startActivity(intent)
+                    (context as ComponentActivity).finish()
                 },
                 onNavigateToRegister = {
                     navController.navigate("username") {
@@ -151,41 +154,12 @@ fun ReciplanApp() {
         composable("username") {
             ChooseUsernameScreen(
                 onUsernameSet = {
-                    navController.navigate("main") {
-                        popUpTo("username") { inclusive = true }
-                    }
+                    // Navigate to MainFragmentActivity instead of placeholder
+                    val intent = Intent(context, MainFragmentActivity::class.java)
+                    context.startActivity(intent)
+                    (context as ComponentActivity).finish()
                 },
                 viewModelFactory = viewModelFactory
-            )
-        }
-        
-        composable("main") {
-            // Placeholder for main app content
-            MainScreen()
-        }
-    }
-}
-
-@Composable
-fun MainScreen() {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        // Placeholder for main app content
-        androidx.compose.foundation.layout.Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-        ) {
-            androidx.compose.material3.Text(
-                text = "Welcome to Reciplan!",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
-            androidx.compose.material3.Text(
-                text = "Authentication flow completed successfully",
-                style = MaterialTheme.typography.bodyMedium
             )
         }
     }

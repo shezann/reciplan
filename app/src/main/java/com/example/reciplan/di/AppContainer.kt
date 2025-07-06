@@ -2,6 +2,7 @@ package com.example.reciplan.di
 
 import android.content.Context
 import com.example.reciplan.data.api.AuthApi
+import com.example.reciplan.data.api.RecipeApi
 import com.example.reciplan.data.auth.AuthRepository
 import com.example.reciplan.data.auth.TokenManager
 import com.example.reciplan.data.network.AuthInterceptor
@@ -58,6 +59,10 @@ class AppContainer(private val context: Context) {
     
     val authApi: AuthApi by lazy {
         retrofit.create(AuthApi::class.java)
+    }
+    
+    val recipeApi: RecipeApi by lazy {
+        retrofit.create(RecipeApi::class.java)
     }
     
     val authRepository: AuthRepository by lazy {
