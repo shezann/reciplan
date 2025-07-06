@@ -124,7 +124,12 @@ class AuthRepository(
                 val authResponse = response.body()
                 if (authResponse != null) {
                     tokenManager.saveTokens(authResponse.access_token, "") // No refresh token in this API
-                    AuthResult.Success(authResponse.user)
+                    
+                    // Use the user data from the auth response and consider setup_required flag
+                    val user = authResponse.user.copy(
+                        setup_complete = !authResponse.setup_required // If setup not required, then it's complete
+                    )
+                    AuthResult.Success(user)
                 } else {
                     AuthResult.Error("Invalid response from server")
                 }
@@ -143,7 +148,12 @@ class AuthRepository(
                 val authResponse = response.body()
                 if (authResponse != null) {
                     tokenManager.saveTokens(authResponse.access_token, "") // No refresh token in this API
-                    AuthResult.Success(authResponse.user)
+                    
+                    // Use the user data from the auth response and consider setup_required flag
+                    val user = authResponse.user.copy(
+                        setup_complete = !authResponse.setup_required // If setup not required, then it's complete
+                    )
+                    AuthResult.Success(user)
                 } else {
                     AuthResult.Error("Invalid response from server")
                 }
@@ -190,7 +200,15 @@ class AuthRepository(
                     Result.failure(Exception("Invalid response"))
                 }
             } else {
-                Result.failure(Exception("Failed to setup user"))
+                // Try to parse error response for better error messages
+                val errorMessage = when (response.code()) {
+                    409 -> "Username already taken or user already has an account"
+                    400 -> "Invalid username or request data"
+                    401 -> "Authentication required"
+                    500 -> "Server error occurred"
+                    else -> "Failed to setup user: ${response.message()}"
+                }
+                Result.failure(Exception(errorMessage))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -212,8 +230,43 @@ class AuthRepository(
         val hasValidTokens = tokenManager.hasValidTokens()
         
         when {
-            currentUser != null && hasValidTokens -> emit(AuthState.Authenticated)
+            currentUser != null && hasValidTokens -> {
+                emit(AuthState.Loading)
+                try {
+                    // Fetch the actual user data from backend
+                    val response = authApi.getCurrentUser()
+                    if (response.isSuccessful) {
+                        val user = response.body()
+                        if (user != null) {
+                            // Update the auth state with the actual user data
+                            emit(AuthState.Authenticated)
+                        } else {
+                            emit(AuthState.Unauthenticated)
+                        }
+                    } else {
+                        // If we can't get user data, but tokens are valid, still consider authenticated
+                        // but with limited data
+                        emit(AuthState.Authenticated)
+                    }
+                } catch (e: Exception) {
+                    // Network error - assume authenticated if we have valid tokens
+                    emit(AuthState.Authenticated)
+                }
+            }
             else -> emit(AuthState.Unauthenticated)
+        }
+    }
+
+    suspend fun getCurrentUserData(): User? {
+        return try {
+            val response = authApi.getCurrentUser()
+            if (response.isSuccessful) {
+                response.body()
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 } 
