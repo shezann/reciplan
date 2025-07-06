@@ -173,12 +173,33 @@ fun ChooseUsernameScreen(
                     containerColor = MaterialTheme.colorScheme.errorContainer
                 )
             ) {
-                Text(
-                    text = errorState.message,
-                    modifier = Modifier.padding(16.dp),
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = errorState.message,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    // If the error indicates the user already has an account, provide an option to skip
+                    if (errorState.message.contains("already has an account", ignoreCase = true)) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "It looks like you already have an account. You can skip this step and go directly to the app.",
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { onUsernameSet() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text("Skip to App")
+                        }
+                    }
+                }
             }
         }
 
