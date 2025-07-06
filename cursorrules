@@ -1,0 +1,7 @@
+# Only let Cursor read real source code
+allow: app/src/**
+
+# Never send secrets or signing keys
+deny: **/gradle.properties
+deny: **/local.properties
+deny: **/*.keystore

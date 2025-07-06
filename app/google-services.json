@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "771971890295",
+    "project_id": "reciplan-c3e17",
+    "storage_bucket": "reciplan-c3e17.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:771971890295:android:5eaf5278033dfd1cd35a72",
+        "android_client_info": {
+          "package_name": "com.example.reciplan"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "771971890295-f2v4csbkkd8l1qibttocbtgcj0pbiu7a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.reciplan",
+            "certificate_hash": "dc7b4a1078397314314fe3022cc9e92a1c85f231"
+          }
+        },
+        {
+          "client_id": "771971890295-5gbmmottvhno7sg422jplfeatn6usnsf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzviQJcc0pjS-b1WLNsaxn5lPgyyggbI0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "771971890295-5gbmmottvhno7sg422jplfeatn6usnsf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
