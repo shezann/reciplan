@@ -1,35 +1,192 @@
 package com.example.reciplan
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
-import com.google.android.material.bottomnavigation.BottomNavigationView
-import androidx.appcompat.app.AppCompatActivity
-import androidx.navigation.findNavController
-import androidx.navigation.ui.AppBarConfiguration
-import androidx.navigation.ui.setupActionBarWithNavController
-import androidx.navigation.ui.setupWithNavController
-import com.example.reciplan.databinding.ActivityMainBinding
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.reciplan.ui.auth.ChooseUsernameScreen
+import com.example.reciplan.ui.auth.LoginScreen
+import com.example.reciplan.ui.splash.SplashScreen
+import com.example.reciplan.ui.theme.ReciplanTheme
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
+import com.example.reciplan.ui.auth.AuthViewModel
+import com.example.reciplan.ui.splash.SplashViewModel
+import androidx.lifecycle.ViewModel
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
-class MainActivity : AppCompatActivity() {
-
-    private lateinit var binding: ActivityMainBinding
-
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Handle email link on app launch
+        handleEmailLinkIfPresent(intent)
+        
+        setContent {
+            ReciplanTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    ReciplanApp()
+                }
+            }
+        }
+    }
+    
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Handle email link when app is already running
+        handleEmailLinkIfPresent(intent)
+    }
+    
+    private fun handleEmailLinkIfPresent(intent: Intent?) {
+        val data: Uri? = intent?.data
+        if (data != null && data.scheme == "https" && data.host == "reciplan-c3e17.firebaseapp.com") {
+            // This is an email link, handle it
+            val emailLink = data.toString()
+            
+            // Get the saved email from SharedPreferences
+            val sharedPrefs = getSharedPreferences("email_auth", MODE_PRIVATE)
+            val email = sharedPrefs.getString("pending_email", null)
+            
+            if (email != null && FirebaseAuth.getInstance().isSignInWithEmailLink(emailLink)) {
+                // Process the email link sign-in
+                val application = applicationContext as ReciplanApplication
+                val authRepository = application.appContainer.authRepository
+                
+                CoroutineScope(Dispatchers.Main).launch {
+                    authRepository.signInWithEmailLink(email, emailLink).collect { result ->
+                        // The result will be handled by the auth flow
+                    }
+                }
+                
+                // Clear the pending email
+                sharedPrefs.edit().remove("pending_email").apply()
+            }
+        }
+    }
+}
 
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+// Custom ViewModelFactory for manual DI
+class ViewModelFactory(private val appContainer: com.example.reciplan.di.AppContainer) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        return when (modelClass) {
+            AuthViewModel::class.java -> {
+                AuthViewModel(appContainer.authRepository) as T
+            }
+            SplashViewModel::class.java -> {
+                SplashViewModel(appContainer.authApi) as T
+            }
+            else -> throw IllegalArgumentException("Unknown ViewModel class: $modelClass")
+        }
+    }
+}
 
-        val navView: BottomNavigationView = binding.navView
-
-        val navController = findNavController(R.id.nav_host_fragment_activity_main)
-        // Passing each menu ID as a set of Ids because each
-        // menu should be considered as top level destinations.
-        val appBarConfiguration = AppBarConfiguration(
-            setOf(
-                R.id.navigation_home, R.id.navigation_dashboard, R.id.navigation_notifications
+@Composable
+fun ReciplanApp() {
+    val navController = rememberNavController()
+    
+    // Get the app container from the application
+    val application = androidx.compose.ui.platform.LocalContext.current.applicationContext as ReciplanApplication
+    val viewModelFactory = ViewModelFactory(application.appContainer)
+    
+    NavHost(
+        navController = navController,
+        startDestination = "splash"
+    ) {
+        composable("splash") {
+            SplashScreen(
+                onNavigateToAuth = {
+                    navController.navigate("login") {
+                        popUpTo("splash") { inclusive = true }
+                    }
+                },
+                onNavigateToMain = {
+                    navController.navigate("main") {
+                        popUpTo("splash") { inclusive = true }
+                    }
+                },
+                onNavigateToUsername = {
+                    navController.navigate("username") {
+                        popUpTo("splash") { inclusive = true }
+                    }
+                },
+                viewModelFactory = viewModelFactory
             )
-        )
-        setupActionBarWithNavController(navController, appBarConfiguration)
-        navView.setupWithNavController(navController)
+        }
+        
+        composable("login") {
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate("main") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                },
+                onNavigateToRegister = {
+                    navController.navigate("username") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+        composable("username") {
+            ChooseUsernameScreen(
+                onUsernameSet = {
+                    navController.navigate("main") {
+                        popUpTo("username") { inclusive = true }
+                    }
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+        composable("main") {
+            // Placeholder for main app content
+            MainScreen()
+        }
+    }
+}
+
+@Composable
+fun MainScreen() {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        // Placeholder for main app content
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+        ) {
+            androidx.compose.material3.Text(
+                text = "Welcome to Reciplan!",
+                style = MaterialTheme.typography.headlineMedium
+            )
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
+            androidx.compose.material3.Text(
+                text = "Authentication flow completed successfully",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
     }
 }

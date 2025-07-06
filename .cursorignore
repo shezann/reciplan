@@ -1,0 +1,8 @@
+# Build & IDE cruft
+/.gradle/
+/.idea/
+/build/
+/app/build/
+/*.iml
+*.apk
+*.aar
