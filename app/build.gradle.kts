@@ -25,7 +25,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:5050\"")
+            buildConfigField("String", "BASE_URL", "\"http://10.120.7.63:5050\"")
             buildConfigField("String", "ENVIRONMENT", "\"debug\"")
         }
         release {
@@ -113,11 +113,13 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
-// Image Loading
-implementation(libs.glide)
+    // Image Loading
+    implementation(libs.glide)
+    implementation(libs.coil.compose)
 
-// UI Components
-implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+    // UI Components
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+    implementation(libs.accompanist.swiperefresh)
 
     // Testing
     testImplementation(libs.junit)

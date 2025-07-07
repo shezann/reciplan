@@ -15,7 +15,6 @@ class AuthInterceptor(
         val url = originalRequest.url.toString()
         if (url.contains("/api/auth/firebase-login") || 
             url.contains("/api/auth/google") || 
-            url.contains("/api/auth/check-username") ||
             url.contains("/health") ||
             url.contains("/api/status")) {
             return chain.proceed(originalRequest)
@@ -23,8 +22,13 @@ class AuthInterceptor(
 
         val accessToken = tokenManager.getAccessToken()
         
+        println("AuthInterceptor: Request to ${originalRequest.url}")
+        println("AuthInterceptor: Access token available: ${accessToken != null}")
+        println("AuthInterceptor: Token preview: ${accessToken?.take(20)}...")
+        
         // If no token, proceed without authorization
         if (accessToken == null) {
+            println("AuthInterceptor: No token available, proceeding without auth")
             return chain.proceed(originalRequest)
         }
 
@@ -33,7 +37,9 @@ class AuthInterceptor(
             .addHeader("Authorization", "Bearer $accessToken")
             .build()
 
+        println("AuthInterceptor: Added Authorization header")
         val response = chain.proceed(requestWithAuth)
+        println("AuthInterceptor: Response code: ${response.code}")
 
         // If we get 401, clear tokens (no refresh token endpoint available)
         if (response.code == 401) {

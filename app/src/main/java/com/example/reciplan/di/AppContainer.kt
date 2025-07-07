@@ -6,6 +6,7 @@ import com.example.reciplan.data.api.RecipeApi
 import com.example.reciplan.data.auth.AuthRepository
 import com.example.reciplan.data.auth.TokenManager
 import com.example.reciplan.data.network.AuthInterceptor
+import com.example.reciplan.data.recipe.RecipeRepository
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -73,5 +74,13 @@ class AppContainer(private val context: Context) {
     
     val authRepository: AuthRepository by lazy {
         AuthRepository(context, authApi, tokenManager)
+    }
+    
+    val recipeApi: RecipeApi by lazy {
+        retrofit.create(RecipeApi::class.java)
+    }
+    
+    val recipeRepository: RecipeRepository by lazy {
+        RecipeRepository(recipeApi)
     }
 } 

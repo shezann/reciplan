@@ -8,7 +8,7 @@ interface RecipeApi {
     
     @GET("api/recipes/feed")
     suspend fun getRecipeFeed(
-        @Query("page") page: Int,
+        @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 10
     ): Response<RecipeFeedResponse>
     
@@ -16,6 +16,27 @@ interface RecipeApi {
     suspend fun getRecipeDetails(
         @Path("id") recipeId: String
     ): Response<RecipeDetailsResponse>
+    
+    @GET("api/recipes/{id}")
+    suspend fun getRecipe(
+        @Path("id") recipeId: String
+    ): Response<RecipeResponse>
+    
+    @POST("api/recipes")
+    suspend fun createRecipe(
+        @Body request: CreateRecipeRequest
+    ): Response<RecipeResponse>
+    
+    @PUT("api/recipes/{id}")
+    suspend fun updateRecipe(
+        @Path("id") recipeId: String,
+        @Body request: UpdateRecipeRequest
+    ): Response<RecipeResponse>
+    
+    @DELETE("api/recipes/{id}")
+    suspend fun deleteRecipe(
+        @Path("id") recipeId: String
+    ): Response<DeleteRecipeResponse>
     
     @POST("api/recipes/{id}/save")
     suspend fun saveRecipe(
@@ -31,18 +52,14 @@ interface RecipeApi {
     suspend fun getSavedRecipes(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 10
-    ): Response<RecipeFeedResponse>
-    
-    @POST("api/recipes")
-    suspend fun createRecipe(
-        @Body request: CreateRecipeRequest
-    ): Response<Recipe>
+    ): Response<SavedRecipesResponse>
     
     @POST("api/recipes/search")
     suspend fun searchRecipes(
         @Body request: RecipeSearchRequest
     ): Response<RecipeFeedResponse>
     
+    // Development/Testing endpoint
     @POST("api/recipes/seed")
     suspend fun seedRecipes(): Response<Map<String, String>>
 } 
