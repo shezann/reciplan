@@ -28,15 +28,18 @@ class TokenManager(
     }
 
     fun saveTokens(accessToken: String, refreshToken: String = "") {
+        println("TokenManager: Saving tokens - accessToken: ${accessToken.take(20)}...")
         prefs.edit().apply {
             putString(ACCESS_TOKEN_KEY, accessToken)
             if (refreshToken.isNotEmpty()) {
                 putString(REFRESH_TOKEN_KEY, refreshToken)
             }
             // Set expiry time to 1 hour from now (JWT tokens typically expire in 1 hour)
-            putLong(TOKEN_EXPIRY_KEY, System.currentTimeMillis() + (60 * 60 * 1000))
+            val expiryTime = System.currentTimeMillis() + (60 * 60 * 1000)
+            putLong(TOKEN_EXPIRY_KEY, expiryTime)
             apply()
         }
+        println("TokenManager: Tokens saved successfully. Expiry: ${java.util.Date(prefs.getLong(TOKEN_EXPIRY_KEY, 0L))}")
     }
 
     fun getAccessToken(): String? {
@@ -50,9 +53,27 @@ class TokenManager(
     fun hasValidTokens(): Boolean {
         val accessToken = getAccessToken()
         val expiryTime = prefs.getLong(TOKEN_EXPIRY_KEY, 0L)
+        val currentTime = System.currentTimeMillis()
         
-        return accessToken != null && 
-               System.currentTimeMillis() < expiryTime
+        // Add a buffer of 5 minutes to prevent using tokens that are about to expire
+        val bufferTime = 5 * 60 * 1000 // 5 minutes in milliseconds
+        val isValid = accessToken != null && (currentTime + bufferTime) < expiryTime
+        
+        println("TokenManager: hasValidTokens() check:")
+        println("  - Access token exists: ${accessToken != null}")
+        println("  - Access token preview: ${accessToken?.take(20)}...")
+        println("  - Current time: ${java.util.Date(currentTime)}")
+        println("  - Expiry time: ${java.util.Date(expiryTime)}")
+        println("  - Buffer time: 5 minutes")
+        println("  - Is valid (with buffer): $isValid")
+        
+        // If token is considered invalid, clear it
+        if (!isValid && accessToken != null) {
+            println("TokenManager: Clearing invalid/expired tokens")
+            clearTokens()
+        }
+        
+        return isValid
     }
 
     fun isTokenExpired(): Boolean {

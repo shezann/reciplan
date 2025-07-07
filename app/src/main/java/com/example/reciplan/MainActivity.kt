@@ -16,13 +16,22 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
 import com.example.reciplan.ui.auth.ChooseUsernameScreen
 import com.example.reciplan.ui.auth.LoginScreen
+import com.example.reciplan.ui.recipe.CreateRecipeScreen
+import com.example.reciplan.ui.recipe.EditRecipeScreen
+import com.example.reciplan.ui.recipe.RecipeDetailScreen
+import com.example.reciplan.ui.recipe.RecipeScreenDevelopment
+import com.example.reciplan.ui.recipe.RecipeScreenDebug
+import com.example.reciplan.ui.main.MainScreen
 import com.example.reciplan.ui.splash.SplashScreen
 import com.example.reciplan.ui.theme.ReciplanTheme
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import com.example.reciplan.ui.auth.AuthViewModel
+import com.example.reciplan.ui.recipe.RecipeViewModel
 import com.example.reciplan.ui.splash.SplashViewModel
 import androidx.lifecycle.ViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -94,6 +103,9 @@ class ViewModelFactory(private val appContainer: com.example.reciplan.di.AppCont
             SplashViewModel::class.java -> {
                 SplashViewModel(appContainer.authApi) as T
             }
+            RecipeViewModel::class.java -> {
+                RecipeViewModel(appContainer.recipeRepository) as T
+            }
             else -> throw IllegalArgumentException("Unknown ViewModel class: $modelClass")
         }
     }
@@ -160,33 +172,70 @@ fun ReciplanApp() {
         }
         
         composable("main") {
-            // Placeholder for main app content
-            MainScreen()
+            MainScreen(
+                onNavigateToCreateRecipe = {
+                    navController.navigate("create_recipe")
+                },
+                onNavigateToRecipeDetail = { recipeId ->
+                    navController.navigate("recipe_detail/$recipeId")
+                },
+                onNavigateToEditRecipe = { recipeId ->
+                    navController.navigate("edit_recipe/$recipeId")
+                },
+                onNavigateToLogin = {
+                    navController.navigate("login") {
+                        popUpTo("main") { inclusive = true }
+                    }
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+        composable("create_recipe") {
+            CreateRecipeScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onRecipeCreated = {
+                    navController.popBackStack()
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+        composable(
+            route = "recipe_detail/{recipeId}",
+            arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val recipeId = backStackEntry.arguments?.getString("recipeId") ?: ""
+            RecipeDetailScreen(
+                recipeId = recipeId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+        composable(
+            route = "edit_recipe/{recipeId}",
+            arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val recipeId = backStackEntry.arguments?.getString("recipeId") ?: ""
+            EditRecipeScreen(
+                recipeId = recipeId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onRecipeUpdated = {
+                    navController.popBackStack()
+                },
+                onRecipeDeleted = {
+                    navController.popBackStack()
+                },
+                viewModelFactory = viewModelFactory
+            )
         }
     }
 }
 
-@Composable
-fun MainScreen() {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        // Placeholder for main app content
-        androidx.compose.foundation.layout.Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-        ) {
-            androidx.compose.material3.Text(
-                text = "Welcome to Reciplan!",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
-            androidx.compose.material3.Text(
-                text = "Authentication flow completed successfully",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
-}

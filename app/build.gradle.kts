@@ -25,7 +25,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:5050\"")
+            buildConfigField("String", "BASE_URL", "\"http://10.2.2.145:5050\"")
             buildConfigField("String", "ENVIRONMENT", "\"debug\"")
         }
         release {
@@ -112,6 +112,12 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
+
+    // Image Loading
+    implementation(libs.coil.compose)
+
+    // Accompanist
+    implementation(libs.accompanist.swiperefresh)
 
     // Testing
     testImplementation(libs.junit)
