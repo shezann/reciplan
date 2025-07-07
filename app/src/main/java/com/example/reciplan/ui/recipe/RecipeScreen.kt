@@ -32,6 +32,7 @@ fun RecipeScreen(
     onNavigateToRecipeDetail: (String) -> Unit,
     onNavigateToEditRecipe: (String) -> Unit,
     viewModelFactory: ViewModelProvider.Factory,
+    showCreateButton: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val viewModel: RecipeViewModel = viewModel(factory = viewModelFactory)
@@ -106,16 +107,18 @@ fun RecipeScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     
-                    FloatingActionButton(
-                        onClick = onNavigateToCreateRecipe,
-                        modifier = Modifier.size(48.dp),
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Recipe",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
+                    if (showCreateButton) {
+                        FloatingActionButton(
+                            onClick = onNavigateToCreateRecipe,
+                            modifier = Modifier.size(48.dp),
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Add Recipe",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
                     }
                 }
                 
@@ -322,6 +325,7 @@ fun RecipeScreenDevelopment(
     onNavigateToRecipeDetail: (String) -> Unit,
     onNavigateToEditRecipe: (String) -> Unit,
     viewModelFactory: ViewModelProvider.Factory,
+    showCreateButton: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val viewModel: RecipeViewModel = viewModel(factory = viewModelFactory)
@@ -359,6 +363,7 @@ fun RecipeScreenDevelopment(
             onNavigateToRecipeDetail = onNavigateToRecipeDetail,
             onNavigateToEditRecipe = onNavigateToEditRecipe,
             viewModelFactory = viewModelFactory,
+            showCreateButton = showCreateButton,
             modifier = Modifier.weight(1f)
         )
     }

@@ -25,6 +25,7 @@ import com.example.reciplan.ui.recipe.EditRecipeScreen
 import com.example.reciplan.ui.recipe.RecipeDetailScreen
 import com.example.reciplan.ui.recipe.RecipeScreenDevelopment
 import com.example.reciplan.ui.recipe.RecipeScreenDebug
+import com.example.reciplan.ui.main.MainScreen
 import com.example.reciplan.ui.splash.SplashScreen
 import com.example.reciplan.ui.theme.ReciplanTheme
 import androidx.compose.ui.unit.dp
@@ -171,7 +172,7 @@ fun ReciplanApp() {
         }
         
         composable("main") {
-            com.example.reciplan.ui.recipe.RecipeScreen(
+            MainScreen(
                 onNavigateToCreateRecipe = {
                     navController.navigate("create_recipe")
                 },
@@ -180,6 +181,11 @@ fun ReciplanApp() {
                 },
                 onNavigateToEditRecipe = { recipeId ->
                     navController.navigate("edit_recipe/$recipeId")
+                },
+                onNavigateToLogin = {
+                    navController.navigate("login") {
+                        popUpTo("main") { inclusive = true }
+                    }
                 },
                 viewModelFactory = viewModelFactory
             )
