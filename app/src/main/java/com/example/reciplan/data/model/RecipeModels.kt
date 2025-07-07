@@ -92,7 +92,7 @@ data class RecipeFeedResponse(
     val recipes: List<Recipe>,
     val page: Int,
     val limit: Int,
-    @SerialName("total_returned") val totalReturned: Int
+    @SerialName("total_returned") val totalReturned: Int = 0
 )
 
 @Serializable
@@ -112,5 +112,5 @@ data class SavedRecipesResponse(
     val recipes: List<Recipe>,
     val page: Int,
     val limit: Int,
-    @SerialName("total_returned") val totalReturned: Int
+    @SerialName("total_returned") val totalReturned: Int = 0
 ) 
