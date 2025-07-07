@@ -132,6 +132,19 @@ class RecipeViewModel(
         }
     }
     
+    // Helper function to check if a recipe matches the current filter criteria
+    private fun recipeMatchesCurrentFilter(recipe: Recipe): Boolean {
+        val currentUiState = _uiState.value
+        return when (currentUiState.selectedFilter) {
+            "All", "" -> true
+            "My Recipes" -> recipe.userId == "IbMRwrirqeyObTyqc9Aa" // Current user's ID
+            else -> recipe.tags.any { it.equals(currentUiState.selectedFilter, ignoreCase = true) }
+        } && (currentUiState.searchQuery.isEmpty() || 
+               recipe.title.contains(currentUiState.searchQuery, ignoreCase = true) ||
+               recipe.description?.contains(currentUiState.searchQuery, ignoreCase = true) == true ||
+               recipe.tags.any { it.contains(currentUiState.searchQuery, ignoreCase = true) })
+    }
+
     // Create new recipe
     fun createRecipe(request: CreateRecipeRequest) {
         viewModelScope.launch {
@@ -142,10 +155,25 @@ class RecipeViewModel(
                     // Add the new recipe to the feed
                     _recipeFeed.value = listOf(recipe) + _recipeFeed.value
                     
+                    // Also add to filtered recipes if it matches current filter criteria
+                    val currentUiState = _uiState.value
+                    val updatedFilteredRecipes = if (currentUiState.filteredRecipes.isNotEmpty() || 
+                                                     currentUiState.searchQuery.isNotEmpty() || 
+                                                     currentUiState.selectedFilter != "All") {
+                        if (recipeMatchesCurrentFilter(recipe)) {
+                            listOf(recipe) + currentUiState.filteredRecipes
+                        } else {
+                            currentUiState.filteredRecipes
+                        }
+                    } else {
+                        currentUiState.filteredRecipes
+                    }
+                    
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = null,
-                        successMessage = "Recipe created successfully!"
+                        successMessage = "Recipe created successfully!",
+                        filteredRecipes = updatedFilteredRecipes
                     )
                 },
                 onFailure = { error ->
@@ -170,6 +198,23 @@ class RecipeViewModel(
                         if (recipe.id == recipeId) updatedRecipe else recipe
                     }
                     
+                    // Also update in filtered recipes if any filters are active
+                    val currentUiState = _uiState.value
+                    val updatedFilteredRecipes = if (currentUiState.filteredRecipes.isNotEmpty() || 
+                                                     currentUiState.searchQuery.isNotEmpty() || 
+                                                     currentUiState.selectedFilter != "All") {
+                        val filteredWithoutOldRecipe = currentUiState.filteredRecipes.filter { it.id != recipeId }
+                        if (recipeMatchesCurrentFilter(updatedRecipe)) {
+                            // Recipe still matches filter, update it in the list
+                            filteredWithoutOldRecipe + updatedRecipe
+                        } else {
+                            // Recipe no longer matches filter, remove it from the list
+                            filteredWithoutOldRecipe
+                        }
+                    } else {
+                        currentUiState.filteredRecipes
+                    }
+                    
                     // Update selected recipe if it's the one being edited
                     if (_selectedRecipe.value?.id == recipeId) {
                         _selectedRecipe.value = updatedRecipe
@@ -178,7 +223,8 @@ class RecipeViewModel(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = null,
-                        successMessage = "Recipe updated successfully!"
+                        successMessage = "Recipe updated successfully!",
+                        filteredRecipes = updatedFilteredRecipes
                     )
                 },
                 onFailure = { error ->
@@ -201,6 +247,16 @@ class RecipeViewModel(
                     // Remove the recipe from the feed
                     _recipeFeed.value = _recipeFeed.value.filter { it.id != deletedRecipeId }
                     
+                    // Also remove from filtered recipes if any filters are active
+                    val currentUiState = _uiState.value
+                    val updatedFilteredRecipes = if (currentUiState.filteredRecipes.isNotEmpty() || 
+                                                     currentUiState.searchQuery.isNotEmpty() || 
+                                                     currentUiState.selectedFilter != "All") {
+                        currentUiState.filteredRecipes.filter { it.id != deletedRecipeId }
+                    } else {
+                        currentUiState.filteredRecipes
+                    }
+                    
                     // Clear selected recipe if it was deleted
                     if (_selectedRecipe.value?.id == deletedRecipeId) {
                         _selectedRecipe.value = null
@@ -209,7 +265,8 @@ class RecipeViewModel(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = null,
-                        successMessage = "Recipe deleted successfully!"
+                        successMessage = "Recipe deleted successfully!",
+                        filteredRecipes = updatedFilteredRecipes
                     )
                 },
                 onFailure = { error ->
