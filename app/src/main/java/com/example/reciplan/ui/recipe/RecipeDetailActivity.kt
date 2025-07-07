@@ -79,6 +79,7 @@ class RecipeDetailActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
+        // Make sure the back button is properly clickable
         binding.buttonBack.setOnClickListener {
             finish()
         }

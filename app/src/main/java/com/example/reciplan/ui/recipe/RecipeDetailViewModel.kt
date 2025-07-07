@@ -33,7 +33,7 @@ class RecipeDetailViewModel(
             try {
                 val response = recipeApi.getRecipeDetails(recipeId)
                 if (response.isSuccessful) {
-                    _recipe.value = response.body()
+                    _recipe.value = response.body()?.recipe
                 } else {
                     _error.value = "Failed to load recipe: ${response.message()}"
                 }

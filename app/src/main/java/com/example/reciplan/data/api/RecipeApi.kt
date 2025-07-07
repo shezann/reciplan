@@ -15,7 +15,7 @@ interface RecipeApi {
     @GET("api/recipes/{id}")
     suspend fun getRecipeDetails(
         @Path("id") recipeId: String
-    ): Response<Recipe>
+    ): Response<RecipeDetailsResponse>
     
     @POST("api/recipes/{id}/save")
     suspend fun saveRecipe(

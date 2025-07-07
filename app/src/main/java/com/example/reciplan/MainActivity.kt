@@ -5,17 +5,20 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.reciplan.ui.auth.ChooseUsernameScreen
 import com.example.reciplan.ui.auth.LoginScreen
 import com.example.reciplan.ui.splash.SplashScreen
@@ -29,10 +32,30 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import androidx.activity.OnBackPressedCallback
+import androidx.core.view.WindowCompat
 
 class MainActivity : ComponentActivity() {
+    
+    private lateinit var backPressedCallback: OnBackPressedCallback
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Enable edge-to-edge display
+        enableEdgeToEdge()
+        
+        // Configure system UI for better splash screen experience
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        
+        // Initialize back button callback
+        backPressedCallback = object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                // This will be updated based on current screen
+                finish()
+            }
+        }
+        onBackPressedDispatcher.addCallback(this, backPressedCallback)
         
         // Handle email link on app launch
         handleEmailLinkIfPresent(intent)
@@ -43,7 +66,16 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    ReciplanApp()
+                    ReciplanApp { isOnSplashScreen ->
+                        // Update back button behavior based on current screen
+                        if (isOnSplashScreen) {
+                            // On splash screen, back button exits the app
+                            backPressedCallback.isEnabled = true
+                        } else {
+                            // On other screens, use default behavior
+                            backPressedCallback.isEnabled = false
+                        }
+                    }
                 }
             }
         }
@@ -100,9 +132,18 @@ class ViewModelFactory(private val appContainer: com.example.reciplan.di.AppCont
 }
 
 @Composable
-fun ReciplanApp() {
+fun ReciplanApp(onScreenChanged: (Boolean) -> Unit) {
     val navController = rememberNavController()
     val context = LocalContext.current
+    
+    // Track current destination to update back button behavior
+    val currentBackStackEntry = navController.currentBackStackEntryAsState()
+    val currentDestination = currentBackStackEntry.value?.destination?.route
+    
+    // Update back button behavior based on current screen
+    LaunchedEffect(currentDestination) {
+        onScreenChanged(currentDestination == "splash")
+    }
     
     // Get the app container from the application
     val application = context.applicationContext as ReciplanApplication

@@ -25,6 +25,12 @@ class AppContainer(private val context: Context) {
         Json {
             ignoreUnknownKeys = true
             coerceInputValues = true
+            isLenient = true
+            encodeDefaults = true
+            explicitNulls = false
+            allowStructuredMapKeys = true
+            allowSpecialFloatingPointValues = true
+            useArrayPolymorphism = false
         }
     }
     

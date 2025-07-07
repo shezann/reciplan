@@ -2,43 +2,44 @@ package com.example.reciplan.data.model
 
 import kotlinx.serialization.Serializable
 import java.util.Date
+import kotlinx.serialization.SerialName
 
 @Serializable
 data class Recipe(
-    val id: String,
-    val title: String,
-    val description: String,
-    val ingredients: List<Ingredient>,
-    val instructions: List<String>,
-    val prep_time: Int, // minutes
-    val cook_time: Int, // minutes
-    val difficulty: Int, // 1-5
-    val servings: Int,
-    val tags: List<String>,
-    val nutrition: Nutrition,
-    val source_platform: String, // 'tiktok', 'instagram', 'youtube'
-    val source_url: String, // Original video URL
-    val video_thumbnail: String, // URL to thumbnail
-    val tiktok_author: String?, // Author username
-    val is_public: Boolean,
-    val user_id: String, // User who imported it
-    val saved_by: List<String>, // List of user IDs who saved it
-    val created_at: String, // ISO date string
-    val updated_at: String // ISO date string
+    @SerialName("id") val id: String,
+    @SerialName("title") val title: String,
+    @SerialName("description") val description: String,
+    @SerialName("ingredients") val ingredients: List<Ingredient>,
+    @SerialName("instructions") val instructions: List<String>,
+    @SerialName("prep_time") val prep_time: Int, // minutes
+    @SerialName("cook_time") val cook_time: Int, // minutes
+    @SerialName("difficulty") val difficulty: Int, // 1-5
+    @SerialName("servings") val servings: Int,
+    @SerialName("tags") val tags: List<String>,
+    @SerialName("nutrition") val nutrition: Nutrition,
+    @SerialName("source_platform") val source_platform: String, // 'tiktok', 'instagram', 'youtube'
+    @SerialName("source_url") val source_url: String, // Original video URL
+    @SerialName("video_thumbnail") val video_thumbnail: String, // URL to thumbnail
+    @SerialName("tiktok_author") val tiktok_author: String?, // Author username
+    @SerialName("is_public") val is_public: Boolean,
+    @SerialName("user_id") val user_id: String, // User who imported it
+    @SerialName("saved_by") val saved_by: List<String>, // List of user IDs who saved it
+    @SerialName("created_at") val created_at: String, // ISO date string
+    @SerialName("updated_at") val updated_at: String // ISO date string
 )
 
 @Serializable
 data class Ingredient(
-    val name: String,
-    val quantity: String
+    @SerialName("name") val name: String,
+    @SerialName("quantity") val quantity: String
 )
 
 @Serializable
 data class Nutrition(
-    val calories: Int,
-    val protein: Float,
-    val carbs: Float,
-    val fat: Float
+    @SerialName("calories") val calories: Int = 0,
+    @SerialName("protein") val protein: Float = 0.0f,
+    @SerialName("carbs") val carbs: Float = 0.0f,
+    @SerialName("fat") val fat: Float = 0.0f
 )
 
 // API Response Models
@@ -84,4 +85,9 @@ data class RecipeSearchRequest(
     val tags: List<String> = emptyList(),
     val difficulty: Int? = null,
     val max_cook_time: Int? = null
+)
+
+@Serializable
+data class RecipeDetailsResponse(
+    @SerialName("recipe") val recipe: Recipe
 ) 
