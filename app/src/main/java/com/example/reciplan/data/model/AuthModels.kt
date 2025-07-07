@@ -50,9 +50,15 @@ data class User(
     val emailVerified: Boolean = false,
     val dietary_restrictions: List<String> = emptyList(),
     val preferences: Map<String, String> = emptyMap(),
+    @kotlinx.serialization.SerialName("setup_completed")
     val setup_complete: Boolean = false,
     val created_at: String = "",
     val updated_at: String = ""
+)
+
+@Serializable
+data class CurrentUserResponse(
+    val user: User
 )
 
 @Serializable

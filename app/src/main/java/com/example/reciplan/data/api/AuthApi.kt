@@ -27,7 +27,7 @@ interface AuthApi {
     ): Response<User>
 
     @GET("api/auth/me")
-    suspend fun getCurrentUser(): Response<User>
+    suspend fun getCurrentUser(): Response<CurrentUserResponse>
 
     @PUT("api/auth/update-profile")
     suspend fun updateProfile(
