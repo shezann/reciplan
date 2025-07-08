@@ -27,19 +27,19 @@ class TokenManager(
         private const val TOKEN_EXPIRY_KEY = "token_expiry"
     }
 
-    fun saveTokens(accessToken: String, refreshToken: String = "") {
-        println("TokenManager: Saving tokens - accessToken: ${accessToken.take(20)}...")
-        prefs.edit().apply {
-            putString(ACCESS_TOKEN_KEY, accessToken)
-            if (refreshToken.isNotEmpty()) {
-                putString(REFRESH_TOKEN_KEY, refreshToken)
-            }
-            // Set expiry time to 1 hour from now (JWT tokens typically expire in 1 hour)
-            val expiryTime = System.currentTimeMillis() + (60 * 60 * 1000)
-            putLong(TOKEN_EXPIRY_KEY, expiryTime)
-            apply()
-        }
-        println("TokenManager: Tokens saved successfully. Expiry: ${java.util.Date(prefs.getLong(TOKEN_EXPIRY_KEY, 0L))}")
+    fun saveTokens(
+        accessToken: String,
+        refreshToken: String? = null,
+        expiresIn: Long = 3600 // Default 1 hour
+    ) {
+        val currentTime = System.currentTimeMillis()
+        val expiryTime = currentTime + (expiresIn * 1000) // Convert to milliseconds
+        
+        prefs.edit()
+            .putString(ACCESS_TOKEN_KEY, accessToken)
+            .putString(REFRESH_TOKEN_KEY, refreshToken)
+            .putLong(TOKEN_EXPIRY_KEY, expiryTime)
+            .apply()
     }
 
     fun getAccessToken(): String? {
@@ -51,25 +51,16 @@ class TokenManager(
     }
 
     fun hasValidTokens(): Boolean {
-        val accessToken = getAccessToken()
-        val expiryTime = prefs.getLong(TOKEN_EXPIRY_KEY, 0L)
+        val accessToken = prefs.getString(ACCESS_TOKEN_KEY, null)
         val currentTime = System.currentTimeMillis()
+        val expiryTime = prefs.getLong(TOKEN_EXPIRY_KEY, 0L)
         
-        // Add a buffer of 5 minutes to prevent using tokens that are about to expire
-        val bufferTime = 5 * 60 * 1000 // 5 minutes in milliseconds
-        val isValid = accessToken != null && (currentTime + bufferTime) < expiryTime
+        // Add 5 minute buffer to account for network delays
+        val bufferTime = 5 * 60 * 1000L // 5 minutes in milliseconds
+        val isValid = accessToken != null && currentTime < (expiryTime - bufferTime)
         
-        println("TokenManager: hasValidTokens() check:")
-        println("  - Access token exists: ${accessToken != null}")
-        println("  - Access token preview: ${accessToken?.take(20)}...")
-        println("  - Current time: ${java.util.Date(currentTime)}")
-        println("  - Expiry time: ${java.util.Date(expiryTime)}")
-        println("  - Buffer time: 5 minutes")
-        println("  - Is valid (with buffer): $isValid")
-        
-        // If token is considered invalid, clear it
-        if (!isValid && accessToken != null) {
-            println("TokenManager: Clearing invalid/expired tokens")
+        if (!isValid) {
+            // Clear invalid tokens
             clearTokens()
         }
         

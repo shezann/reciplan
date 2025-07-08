@@ -25,7 +25,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://10.120.7.63:5050\"")
+            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:5050\"")
             buildConfigField("String", "ENVIRONMENT", "\"debug\"")
         }
         release {
@@ -46,8 +46,7 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-    buildFeatures {
-        viewBinding = true
+buildFeatures {
         compose = true
         buildConfig = true
     }
@@ -68,8 +67,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.lifecycle.livedata.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
-    implementation(libs.androidx.navigation.fragment.ktx)
-    implementation(libs.androidx.navigation.ui.ktx)
+
 
     // Firebase
     implementation(platform(libs.firebase.bom))
@@ -117,9 +115,21 @@ dependencies {
     implementation(libs.glide)
     implementation(libs.coil.compose)
 
-    // UI Components
-    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+// UI Components
     implementation(libs.accompanist.swiperefresh)
+    
+    // Image handling and camera
+    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("androidx.camera:camera-camera2:1.3.4")
+    implementation("androidx.camera:camera-lifecycle:1.3.4")
+    implementation("androidx.camera:camera-view:1.3.4")
+    
+    // Permissions
+    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+    
+    // File picker
+    implementation("androidx.activity:activity-ktx:1.9.2")
 
     // Testing
     testImplementation(libs.junit)

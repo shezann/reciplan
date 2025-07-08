@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.google.firebase.auth.FirebaseAuth
 
 class RecipeViewModel(
     private val recipeRepository: RecipeRepository
@@ -62,8 +63,8 @@ class RecipeViewModel(
                         println("RecipeViewModel: Recipe $index:")
                         println("RecipeViewModel:   - ID: ${recipe.id}")
                         println("RecipeViewModel:   - Title: ${recipe.title}")
-                        println("RecipeViewModel:   - UserId: ${recipe.userId}")
-                        println("RecipeViewModel:   - SourcePlatform: '${recipe.sourcePlatform}' (null? ${recipe.sourcePlatform == null}, blank? ${recipe.sourcePlatform.isNullOrBlank()})")
+                        println("RecipeViewModel:   - UserId: ${recipe.user_id}")
+                        println("RecipeViewModel:   - SourcePlatform: '${recipe.source_platform}' (null? ${recipe.source_platform == null}, blank? ${recipe.source_platform.isNullOrBlank()})")
                     }
                     
                     val newRecipes = if (refresh) {
@@ -75,7 +76,7 @@ class RecipeViewModel(
                     println("RecipeViewModel: Total recipes in feed: ${newRecipes.size}")
                     
                     // Debug: Count user-created recipes
-                    val userCreatedCount = newRecipes.count { it.sourcePlatform.isNullOrBlank() }
+                    val userCreatedCount = newRecipes.count { it.source_platform.isNullOrBlank() }
                     println("RecipeViewModel: User-created recipes (sourcePlatform null/blank): $userCreatedCount")
                     
                     _recipeFeed.value = newRecipes
@@ -135,9 +136,11 @@ class RecipeViewModel(
     // Helper function to check if a recipe matches the current filter criteria
     private fun recipeMatchesCurrentFilter(recipe: Recipe): Boolean {
         val currentUiState = _uiState.value
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+        
         return when (currentUiState.selectedFilter) {
             "All", "" -> true
-            "My Recipes" -> recipe.userId == "IbMRwrirqeyObTyqc9Aa" // Current user's ID
+            "My Recipes" -> recipe.user_id == currentUserId
             else -> recipe.tags.any { it.equals(currentUiState.selectedFilter, ignoreCase = true) }
         } && (currentUiState.searchQuery.isEmpty() || 
                recipe.title.contains(currentUiState.searchQuery, ignoreCase = true) ||
@@ -335,16 +338,17 @@ class RecipeViewModel(
         println("RecipeViewModel: Filtering by tag: '$tag'")
         println("RecipeViewModel: Total recipes available: ${_recipeFeed.value.size}")
         
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
         val filteredRecipes = if (tag.isEmpty() || tag == "All") {
             _recipeFeed.value
         } else if (tag == "My Recipes") {
             // Filter for user-created recipes (userId matches current user)
             val userRecipes = _recipeFeed.value.filter { recipe ->
-                recipe.userId == "IbMRwrirqeyObTyqc9Aa" // Current user's ID
+                recipe.user_id == currentUserId
             }
             println("RecipeViewModel: My Recipes filter - found ${userRecipes.size} recipes")
             userRecipes.forEach { recipe ->
-                println("  - ${recipe.title} (sourcePlatform: '${recipe.sourcePlatform}')")
+                println("  - ${recipe.title} (sourcePlatform: '${recipe.source_platform}')")
             }
             userRecipes
         } else {

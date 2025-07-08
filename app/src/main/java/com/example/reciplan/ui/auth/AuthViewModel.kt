@@ -32,21 +32,24 @@ class AuthViewModel(
                 when (state) {
                     is com.example.reciplan.data.auth.AuthState.Authenticated -> {
                         // Fetch the actual user data from backend
-                        val userData = authRepository.getCurrentUserData()
-                        if (userData != null) {
-                            // Set setup_complete based on whether user has a username
-                            val userWithSetupFlag = userData.copy(
-                                setup_complete = !userData.username.isNullOrBlank()
-                            )
-                            println("AuthViewModel: User data retrieved - username: ${userData.username}, setup_complete: ${userWithSetupFlag.setup_complete}")
-                            _authState.value = AuthResult.Success(userWithSetupFlag)
-                        } else {
-                            println("AuthViewModel: Backend data not available, this shouldn't happen if authenticated")
-                            // If we're authenticated but can't get user data, there's a problem
-                            // Sign out and let the user re-authenticate
-                            authRepository.signOut()
-                            _authState.value = AuthResult.Error("Authentication failed, please sign in again")
-                        }
+                        val userResult = authRepository.getCurrentUserData()
+                        userResult.fold(
+                            onSuccess = { userData ->
+                                // Set setup_complete based on whether user has a username
+                                val userWithSetupFlag = userData.copy(
+                                    setup_complete = !userData.username.isNullOrBlank()
+                                )
+                                println("AuthViewModel: User data retrieved - username: ${userData.username}, setup_complete: ${userWithSetupFlag.setup_complete}")
+                                _authState.value = AuthResult.Success(userWithSetupFlag)
+                            },
+                            onFailure = { error ->
+                                println("AuthViewModel: Backend data not available, this shouldn't happen if authenticated")
+                                // If we're authenticated but can't get user data, there's a problem
+                                // Sign out and let the user re-authenticate
+                                authRepository.signOut()
+                                _authState.value = AuthResult.Error("Authentication failed, please sign in again")
+                            }
+                        )
                     }
                     is com.example.reciplan.data.auth.AuthState.Unauthenticated -> {
                         _authState.value = AuthResult.Error("User not authenticated")
@@ -137,19 +140,33 @@ class AuthViewModel(
         }
     }
 
-    fun signOut() {
+    // Method to force complete logout and clear all stored data
+    fun forceLogout() {
         viewModelScope.launch {
-            authRepository.signOut()
-            _authState.value = AuthResult.Loading
+            println("AuthViewModel: Forcing complete logout")
+            authRepository.forceSignOut()
+            _authState.value = AuthResult.Error("Logged out - please sign in again")
         }
     }
 
-    // Method to clear all authentication state and force fresh login
+    // Method to clear all authentication state and force fresh login (alias for forceLogout)
     fun clearAuthenticationState() {
-        viewModelScope.launch {
-            println("AuthViewModel: Clearing all authentication state")
-            authRepository.signOut()
-            _authState.value = AuthResult.Error("Please sign in again")
+        forceLogout()
+    }
+
+    // Method to get debug information about current auth state
+    fun getDebugInfo(): String {
+        val currentAuthState = _authState.value
+        return when (currentAuthState) {
+            is AuthResult.Success -> {
+                "Authenticated - User: ${currentAuthState.user.email}, Username: ${currentAuthState.user.username}, Setup Complete: ${currentAuthState.user.setup_complete}"
+            }
+            is AuthResult.Error -> {
+                "Error - ${currentAuthState.message}"
+            }
+            is AuthResult.Loading -> {
+                "Loading authentication state..."
+            }
         }
     }
 }

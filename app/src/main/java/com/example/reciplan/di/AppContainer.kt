@@ -76,10 +76,6 @@ class AppContainer(private val context: Context) {
         AuthRepository(context, authApi, tokenManager)
     }
     
-    val recipeApi: RecipeApi by lazy {
-        retrofit.create(RecipeApi::class.java)
-    }
-    
     val recipeRepository: RecipeRepository by lazy {
         RecipeRepository(recipeApi)
     }

@@ -26,6 +26,7 @@ import com.example.reciplan.ui.auth.LoginScreen
 import com.example.reciplan.ui.recipe.CreateRecipeScreen
 import com.example.reciplan.ui.recipe.EditRecipeScreen
 import com.example.reciplan.ui.recipe.RecipeDetailScreen
+import com.example.reciplan.ui.recipe.RecipeDetailViewModel
 import com.example.reciplan.ui.recipe.RecipeScreenDevelopment
 import com.example.reciplan.ui.recipe.RecipeScreenDebug
 import com.example.reciplan.ui.main.MainScreen
@@ -34,6 +35,8 @@ import com.example.reciplan.ui.theme.ReciplanTheme
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import com.example.reciplan.ui.auth.AuthViewModel
+import com.example.reciplan.ui.favorites.FavoritesViewModel
+import com.example.reciplan.ui.home.HomeViewModel
 import com.example.reciplan.ui.recipe.RecipeViewModel
 import com.example.reciplan.ui.splash.SplashViewModel
 import androidx.lifecycle.ViewModel
@@ -138,6 +141,16 @@ class ViewModelFactory(private val appContainer: com.example.reciplan.di.AppCont
             RecipeViewModel::class.java -> {
                 RecipeViewModel(appContainer.recipeRepository) as T
             }
+HomeViewModel::class.java -> {
+                HomeViewModel(appContainer.recipeRepository) as T
+            }
+FavoritesViewModel::class.java -> {
+                FavoritesViewModel(appContainer.recipeRepository) as T
+            }
+            RecipeDetailViewModel::class.java -> {
+                // RecipeDetailViewModel needs recipeId parameter, so it's created directly in screens
+                throw IllegalArgumentException("RecipeDetailViewModel should be created with recipeId parameter")
+            }
             else -> throw IllegalArgumentException("Unknown ViewModel class: $modelClass")
         }
     }
@@ -172,11 +185,10 @@ fun ReciplanApp(onScreenChanged: (Boolean) -> Unit) {
                         popUpTo("splash") { inclusive = true }
                     }
                 },
-                onNavigateToMain = {
-                    // Navigate to MainFragmentActivity instead of placeholder
-                    val intent = Intent(context, MainFragmentActivity::class.java)
-                    context.startActivity(intent)
-                    (context as ComponentActivity).finish()
+onNavigateToMain = {
+                    navController.navigate("main") {
+                        popUpTo("splash") { inclusive = true }
+                    }
                 },
                 onNavigateToUsername = {
                     navController.navigate("username") {
@@ -189,11 +201,10 @@ fun ReciplanApp(onScreenChanged: (Boolean) -> Unit) {
         
         composable("login") {
             LoginScreen(
-                onLoginSuccess = {
-                    // Navigate to MainFragmentActivity instead of placeholder
-                    val intent = Intent(context, MainFragmentActivity::class.java)
-                    context.startActivity(intent)
-                    (context as ComponentActivity).finish()
+onLoginSuccess = {
+                    navController.navigate("main") {
+                        popUpTo("login") { inclusive = true }
+                    }
                 },
                 onNavigateToRegister = {
                     navController.navigate("username") {
@@ -206,14 +217,85 @@ fun ReciplanApp(onScreenChanged: (Boolean) -> Unit) {
         
         composable("username") {
             ChooseUsernameScreen(
-                onUsernameSet = {
-                    // Navigate to MainFragmentActivity instead of placeholder
-                    val intent = Intent(context, MainFragmentActivity::class.java)
-                    context.startActivity(intent)
-                    (context as ComponentActivity).finish()
+onUsernameSet = {
+                    navController.navigate("main") {
+                        popUpTo("username") { inclusive = true }
+                    }
                 },
                 viewModelFactory = viewModelFactory
             )
         }
+        
+        // Main app navigation with bottom tabs
+        composable("main") {
+            MainScreen(
+                onNavigateToCreateRecipe = {
+                    navController.navigate("create_recipe")
+                },
+                onNavigateToRecipeDetail = { recipeId ->
+                    navController.navigate("recipe_detail/$recipeId")
+                },
+                onNavigateToEditRecipe = { recipeId ->
+                    navController.navigate("edit_recipe/$recipeId")
+                },
+                onNavigateToLogin = {
+                    navController.navigate("login") {
+                        popUpTo("main") { inclusive = true }
+                    }
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+        // Recipe creation screen
+        composable("create_recipe") {
+            CreateRecipeScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onRecipeCreated = {
+                    navController.popBackStack()
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+        // Recipe detail screen
+        composable(
+            "recipe_detail/{recipeId}",
+            arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val recipeId = backStackEntry.arguments?.getString("recipeId") ?: ""
+            RecipeDetailScreen(
+                recipeId = recipeId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+        // Recipe edit screen
+        composable(
+            "edit_recipe/{recipeId}",
+            arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val recipeId = backStackEntry.arguments?.getString("recipeId") ?: ""
+            EditRecipeScreen(
+                recipeId = recipeId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onRecipeUpdated = {
+                    navController.popBackStack()
+                },
+                onRecipeDeleted = {
+                    navController.popBackStack("main", false)
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+
     }
 }

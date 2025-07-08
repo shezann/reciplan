@@ -1,58 +1,42 @@
-package com.example.reciplan.ui.home
+package com.example.reciplan.ui.favorites
 
 import android.content.Intent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.example.reciplan.data.model.Recipe
+import com.example.reciplan.ui.recipe.RecipeCard
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.snapshotFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(
+fun FavoritesScreen(
     onNavigateToRecipeDetail: (String) -> Unit = {},
-    onNavigateToCreateRecipe: () -> Unit = {},
     onNavigateToEditRecipe: (String) -> Unit = {},
     viewModelFactory: ViewModelProvider.Factory,
     modifier: Modifier = Modifier
 ) {
-    val viewModel: HomeViewModel = viewModel(factory = viewModelFactory)
+    val viewModel: FavoritesViewModel = viewModel(factory = viewModelFactory)
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    
-    val categories = listOf("All", "Breakfast", "Lunch", "Dinner")
     
     Column(
         modifier = modifier
@@ -63,7 +47,7 @@ fun HomeScreen(
         TopAppBar(
             title = { 
                 Text(
-                    text = "Discover Recipes",
+                    text = "Favorites",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 ) 
@@ -73,136 +57,28 @@ fun HomeScreen(
             )
         )
         
-        // Search Bar
-        SearchBar(
-            query = uiState.searchQuery,
-            onQueryChange = { query ->
-                viewModel.updateSearchQuery(query)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-        
-        // Tab Row
-        ScrollableTabRow(
-            selectedTabIndex = uiState.selectedTab,
-            modifier = Modifier.fillMaxWidth(),
-            edgePadding = 16.dp
-        ) {
-            categories.forEachIndexed { index, category ->
-                Tab(
-                    selected = uiState.selectedTab == index,
-                    onClick = { viewModel.selectTab(index) },
-                    text = {
-                        Text(
-                            text = category,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = if (uiState.selectedTab == index) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                )
-            }
-        }
-        
-        // Recipe List Content
-        RecipeListContent(
+// Favorites List Content
+        FavoritesListContent(
             uiState = uiState,
             onRecipeClick = onNavigateToRecipeDetail,
-            onRecipeSave = { recipe -> 
-                val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-                if (currentUserId != null && recipe.saved_by.contains(currentUserId)) {
-                    viewModel.unsaveRecipe(recipe.id)
-                } else {
-                    viewModel.saveRecipe(recipe.id) 
-                }
-            },
             onRecipeUnsave = { recipe -> viewModel.unsaveRecipe(recipe.id) },
-            onRecipeShare = { recipe -> shareRecipe(context, recipe) },
             onEditRecipe = onNavigateToEditRecipe,
-            onRefresh = { 
-                viewModel.refresh()
-            },
-            onLoadMore = { viewModel.loadMoreRecipes() },
+            onRefresh = { viewModel.refresh() },
+            onLoadMore = { viewModel.loadMoreSavedRecipes() },
             onRetry = { 
                 viewModel.clearError()
-                val category = if (uiState.selectedTab == 0) "" else categories[uiState.selectedTab]
-                viewModel.loadRecipes(category)
+                viewModel.loadSavedRecipes()
             },
             modifier = Modifier.fillMaxSize()
         )
     }
-    
-    // FAB for recipe creation
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.BottomEnd
-    ) {
-        FloatingActionButton(
-            onClick = onNavigateToCreateRecipe,
-            modifier = Modifier.padding(16.dp),
-            containerColor = MaterialTheme.colorScheme.primary
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "Add Recipe"
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = modifier,
-        placeholder = { Text("Search recipes...") },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = "Search"
-            )
-        },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(
-                    onClick = { onQueryChange("") }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Clear,
-                        contentDescription = "Clear"
-                    )
-                }
-            }
-        },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(
-            onSearch = {
-                focusManager.clearFocus()
-                keyboardController?.hide()
-            }
-        ),
-        shape = RoundedCornerShape(12.dp)
-    )
 }
 
 @Composable
-private fun RecipeListContent(
-    uiState: HomeUiState,
+private fun FavoritesListContent(
+    uiState: FavoritesUiState,
     onRecipeClick: (String) -> Unit,
-    onRecipeSave: (Recipe) -> Unit,
     onRecipeUnsave: (Recipe) -> Unit,
-    onRecipeShare: (Recipe) -> Unit,
     onEditRecipe: (String) -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
@@ -215,9 +91,9 @@ private fun RecipeListContent(
     // Detect when user scrolls to bottom for pagination
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-            .collect { lastVisibleIndex ->
+            .collectLatest { lastVisibleIndex ->
                 if (lastVisibleIndex != null && 
-                    lastVisibleIndex >= uiState.recipes.size - 3 && 
+                    lastVisibleIndex >= uiState.favoriteRecipes.size - 3 && 
                     uiState.hasMorePages && 
                     !uiState.isLoadingMore && 
                     !uiState.isLoading) {
@@ -244,7 +120,7 @@ private fun RecipeListContent(
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Loading recipes...",
+                            text = "Loading your favorites...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -261,34 +137,33 @@ private fun RecipeListContent(
                 )
             }
             
-            uiState.recipes.isEmpty() -> {
+            uiState.favoriteRecipes.isEmpty() -> {
                 // Empty State
                 EmptyStateContent(
-                    title = "No recipes found",
-                    subtitle = "Try adjusting your search or pull to refresh",
+                    title = "No saved recipes",
+                    subtitle = "Save recipes to view them here",
                     modifier = Modifier.fillMaxSize()
                 )
             }
             
             else -> {
-                // Recipe List
+                // Favorites List
                 LazyColumn(
                     state = listState,
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(uiState.recipes) { recipe ->
-                        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-                        com.example.reciplan.ui.recipe.RecipeCard(
+items(uiState.favoriteRecipes) { recipe ->
+                        RecipeCard(
                             recipe = recipe,
                             onRecipeClick = { recipeId -> onRecipeClick(recipeId) },
-                            onSaveClick = { recipeId -> onRecipeSave(recipe) },
+                            onSaveClick = { /* Already saved */ },
                             onUnsaveClick = { recipeId -> onRecipeUnsave(recipe) },
                             onEditClick = { recipeId -> onEditRecipe(recipeId) },
                             onDeleteClick = { recipeId -> /* Delete functionality can be added if needed */ },
-                            isSaved = currentUserId?.let { recipe.saved_by.contains(it) } ?: false,
-                            isOwner = currentUserId != null && recipe.user_id == currentUserId
+                            isSaved = true,
+                            isOwner = recipe.user_id == FirebaseAuth.getInstance().currentUser?.uid
                         )
                     }
                     
@@ -313,8 +188,6 @@ private fun RecipeListContent(
     }
 }
 
-
-
 @Composable
 private fun EmptyStateContent(
     title: String,
@@ -330,7 +203,7 @@ private fun EmptyStateContent(
             modifier = Modifier.padding(32.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Star,
+                imageVector = Icons.Default.FavoriteBorder,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
@@ -346,6 +219,13 @@ private fun EmptyStateContent(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Discover recipes and tap the ❤️ icon to save them here!",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
@@ -375,7 +255,7 @@ private fun ErrorStateContent(
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Something went wrong",
+                text = "Unable to load favorites",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
@@ -402,42 +282,15 @@ private fun getFriendlyErrorMessage(error: String): String {
         error.contains("timeout", ignoreCase = true) -> 
             "Check your internet connection and try again"
         error.contains("404", ignoreCase = true) -> 
-            "Recipes not found. Please try again later"
+            "Favorites not found. Please try again later"
         error.contains("500", ignoreCase = true) || 
         error.contains("server", ignoreCase = true) ->
             "Server is temporarily unavailable. Please try again later"
-        else -> "Something went wrong. Please try again"
+        error.contains("Unauthorized", ignoreCase = true) ||
+        error.contains("401", ignoreCase = true) ->
+            "Please log in again to view your favorites"
+        else -> "Unable to load your favorites. Please try again"
     }
 }
 
-private fun shareRecipe(context: android.content.Context, recipe: Recipe) {
-    try {
-        val shareText = buildString {
-            append("${recipe.title}\n\n")
-            if (!recipe.description.isNullOrBlank()) {
-                append("${recipe.description}\n\n")
-            }
-            append("Ingredients:\n")
-            recipe.ingredients.forEach { ingredient ->
-                append("• ${ingredient.quantity} ${ingredient.name}\n")
-            }
-            append("\nInstructions:\n")
-            recipe.instructions.forEachIndexed { index, instruction ->
-                append("${index + 1}. $instruction\n")
-            }
-            if (!recipe.source_url.isNullOrBlank()) {
-                append("\nView full recipe: ${recipe.source_url}")
-            }
-        }
-        
-        val shareIntent = Intent().apply {
-            action = Intent.ACTION_SEND
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, shareText)
-            putExtra(Intent.EXTRA_SUBJECT, "Recipe: ${recipe.title}")
-        }
-        context.startActivity(Intent.createChooser(shareIntent, "Share Recipe"))
-    } catch (e: Exception) {
-        // Handle error gracefully - no need to show error for share action
-    }
-} 
+ 

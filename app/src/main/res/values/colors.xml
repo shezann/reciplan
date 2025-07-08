@@ -7,4 +7,8 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    
+    <!-- Modern food-themed colors -->
+    <color name="orange_40">#FFE64100</color>
+    <color name="grey_60">#FF938F96</color>
 </resources>

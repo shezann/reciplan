@@ -2,6 +2,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Network permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- Camera and Storage permissions for recipe images -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" android:minSdkVersion="33" />
+    
+    <!-- Camera feature (optional) -->
+    <uses-feature 
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <application
         android:name=".ReciplanApplication"
         android:allowBackup="true"
@@ -34,18 +48,7 @@
                       android:pathPrefix="/__/auth/action" />
             </intent-filter>
         </activity>
-        
-        <activity
-            android:name=".MainFragmentActivity"
-            android:exported="false"
-            android:label="@string/app_name">
-        </activity>
-        
-        <activity
-            android:name=".ui.recipe.RecipeDetailActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Reciplan.NoActionBar">
-        </activity>
+
     </application>
 
 </manifest>

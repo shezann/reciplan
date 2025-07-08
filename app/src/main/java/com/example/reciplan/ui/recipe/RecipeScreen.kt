@@ -24,6 +24,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.reciplan.data.model.Recipe
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -262,7 +263,7 @@ fun RecipeScreen(
                                 showDeleteDialog = true
                             },
                             isSaved = false, // You would check this against saved recipes
-                            isOwner = currentUserId != null && recipe.userId == currentUserId
+                            isOwner = currentUserId != null && recipe.user_id == currentUserId
                         )
                     }
                     

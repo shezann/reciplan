@@ -15,6 +15,7 @@ data class Recipe(
     @SerialName("cook_time") val cook_time: Int = 0, // minutes
     @SerialName("difficulty") val difficulty: Int = 1, // 1-5
     @SerialName("servings") val servings: Int = 1,
+    @SerialName("rating") val rating: Float? = null, // 1-5 stars
     @SerialName("tags") val tags: List<String> = emptyList(),
     @SerialName("nutrition") val nutrition: Nutrition? = null,
     @SerialName("source_platform") val source_platform: String? = null, // 'tiktok', 'instagram', 'youtube'
@@ -86,6 +87,7 @@ data class RecipeSearchRequest(
     val query: String,
     val page: Int = 1,
     val limit: Int = 10,
+    val category: String? = null,
     val tags: List<String> = emptyList(),
     val difficulty: Int? = null,
     val max_cook_time: Int? = null
@@ -126,7 +128,8 @@ data class SavedRecipesResponse(
     val recipes: List<Recipe>,
     val page: Int,
     val limit: Int,
-    @SerialName("total_returned") val totalReturned: Int = 0
+    @SerialName("total_returned") val totalReturned: Int = 0,
+    val has_next: Boolean? = null
 )
 
 @Serializable

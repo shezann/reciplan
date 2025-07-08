@@ -22,30 +22,21 @@ class AuthInterceptor(
 
         val accessToken = tokenManager.getAccessToken()
         
-        println("AuthInterceptor: Request to ${originalRequest.url}")
-        println("AuthInterceptor: Access token available: ${accessToken != null}")
-        println("AuthInterceptor: Token preview: ${accessToken?.take(20)}...")
-        
-        // If no token, proceed without authorization
-        if (accessToken == null) {
-            println("AuthInterceptor: No token available, proceeding without auth")
+        if (accessToken != null) {
+            val newRequest = originalRequest.newBuilder()
+                .header("Authorization", "Bearer $accessToken")
+                .build()
+            
+            val response = chain.proceed(newRequest)
+            
+            // If we get 401, clear tokens (no refresh token endpoint available)
+            if (response.code == 401) {
+                tokenManager.clearTokens()
+            }
+            
+            return response
+        } else {
             return chain.proceed(originalRequest)
         }
-
-        // Add authorization header
-        val requestWithAuth = originalRequest.newBuilder()
-            .addHeader("Authorization", "Bearer $accessToken")
-            .build()
-
-        println("AuthInterceptor: Added Authorization header")
-        val response = chain.proceed(requestWithAuth)
-        println("AuthInterceptor: Response code: ${response.code}")
-
-        // If we get 401, clear tokens (no refresh token endpoint available)
-        if (response.code == 401) {
-            tokenManager.clearTokens()
-        }
-
-        return response
     }
 } 

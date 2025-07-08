@@ -153,36 +153,27 @@ class AuthRepository(
 
     private suspend fun authenticateWithGoogle(googleToken: String): AuthResult {
         return try {
-            println("AuthRepository: Sending Google token to backend...")
             val response = authApi.googleLogin(GoogleLoginRequest(googleToken))
-            println("AuthRepository: Backend response code: ${response.code()}")
             
             if (response.isSuccessful) {
                 val authResponse = response.body()
-                println("AuthRepository: Backend response body: $authResponse")
                 
                 if (authResponse != null) {
-                    println("AuthRepository: Saving access token: ${authResponse.access_token?.take(20)}...")
                     tokenManager.saveTokens(authResponse.access_token, "") // No refresh token in this API
                     
                     // Use the user data from the auth response and consider setup_required flag
                     val user = authResponse.user.copy(
                         setup_complete = !authResponse.setup_required // If setup not required, then it's complete
                     )
-                    println("AuthRepository: User authenticated successfully: ${user.id}")
                     AuthResult.Success(user)
                 } else {
-                    println("AuthRepository: Null response body from backend")
                     AuthResult.Error("Invalid response from server")
                 }
             } else {
                 val errorBody = response.errorBody()?.string()
-                println("AuthRepository: Backend error: ${response.code()} - $errorBody")
                 AuthResult.Error("Authentication failed: ${response.message()}")
             }
         } catch (e: Exception) {
-            println("AuthRepository: Exception during Google auth: ${e.message}")
-            e.printStackTrace()
             AuthResult.Error("Network error: ${e.message}")
         }
     }
@@ -261,14 +252,30 @@ class AuthRepository(
         }
     }
 
-    suspend fun signOut() {
+    // Force complete sign out including clearing all cached Google sign-in data
+    suspend fun forceSignOut() {
         try {
+            println("AuthRepository: Forcing complete sign out")
             firebaseAuth.signOut()
             googleSignInClient.signOut().await()
+            googleSignInClient.revokeAccess().await()
             tokenManager.clearTokens()
+            
+            // Clear any cached email auth data
+            val sharedPrefs = context.getSharedPreferences("email_auth", Context.MODE_PRIVATE)
+            sharedPrefs.edit().clear().apply()
+            
+            println("AuthRepository: Force sign out completed")
         } catch (e: Exception) {
-            // Handle error
+            println("AuthRepository: Error during force sign out: ${e.message}")
+            // Still clear tokens even if other operations fail
+            tokenManager.clearTokens()
         }
+    }
+
+    // Alias for backward compatibility
+    suspend fun signOut() {
+        forceSignOut()
     }
 
     fun getAuthState(): Flow<AuthState> = flow {
@@ -304,9 +311,16 @@ class AuthRepository(
                     }
                 } catch (e: Exception) {
                     println("AuthRepository: Network error during auth validation: ${e.message}")
-                    // Network error - clear tokens and sign out to force fresh authentication
-                    signOut()
-                    emit(AuthState.Unauthenticated)
+                    // For network errors, check if we're offline vs server issues
+                    if (e.message?.contains("Unable to resolve host") == true || 
+                        e.message?.contains("No address associated with hostname") == true) {
+                        println("AuthRepository: Network connectivity issue - staying authenticated but showing warning")
+                        emit(AuthState.Authenticated) // Allow offline usage
+                    } else {
+                        println("AuthRepository: Server error - clearing authentication")
+                        signOut()
+                        emit(AuthState.Unauthenticated)
+                    }
                 }
             }
             currentUser != null && !hasValidTokens -> {
@@ -345,59 +359,51 @@ class AuthRepository(
         }
     }
 
-    suspend fun getCurrentUserData(): User? {
+    suspend fun getCurrentUserData(): Result<User> {
         return try {
-            println("AuthRepository: getCurrentUserData() - attempting to get user data")
             val response = authApi.getCurrentUser()
-            println("AuthRepository: getCurrentUserData() - response code: ${response.code()}")
             
             if (response.isSuccessful) {
                 val userResponse = response.body()
                 val user = userResponse?.user
-                println("AuthRepository: getCurrentUserData() - user: ${user?.email}")
-                user
+                if (user != null) {
+                    Result.success(user)
+                } else {
+                    Result.failure(Exception("User data not found"))
+                }
             } else {
-                println("AuthRepository: getCurrentUserData() - failed, attempting re-authentication")
                 // Backend call failed, try to re-authenticate with Google token
                 val googleAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
                 if (googleAccount != null && googleAccount.idToken != null) {
-                    println("AuthRepository: Re-authenticating with Google token")
                     val authResult = authenticateWithGoogle(googleAccount.idToken!!)
                     if (authResult is AuthResult.Success) {
-                        println("AuthRepository: Re-authentication successful, returning user")
-                        authResult.user
+                        Result.success(authResult.user)
                     } else {
-                        println("AuthRepository: Re-authentication failed")
-                        null
+                        Result.failure(Exception("Re-authentication failed"))
                     }
                 } else {
-                    println("AuthRepository: No Google account available for re-authentication")
-                    null
+                    Result.failure(Exception("No Google account available for re-authentication"))
                 }
             }
         } catch (e: Exception) {
-            println("AuthRepository: getCurrentUserData() - exception: ${e.message}")
             // Network error - try to re-authenticate with Google token
             try {
                 val googleAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
                 if (googleAccount != null && googleAccount.idToken != null) {
-                    println("AuthRepository: Re-authenticating with Google token after network error")
                     val authResult = authenticateWithGoogle(googleAccount.idToken!!)
                     if (authResult is AuthResult.Success) {
-                        println("AuthRepository: Re-authentication successful after network error")
-                        authResult.user
+                        Result.success(authResult.user)
                     } else {
-                        println("AuthRepository: Re-authentication failed after network error")
-                        null
+                        Result.failure(Exception("Re-authentication failed after network error"))
                     }
                 } else {
-                    println("AuthRepository: No Google account available for re-authentication after network error")
-                    null
+                    Result.failure(Exception("No Google account available for re-authentication after network error"))
                 }
             } catch (reAuthException: Exception) {
-                println("AuthRepository: Re-authentication failed with exception: ${reAuthException.message}")
-                null
+                Result.failure(reAuthException)
             }
         }
     }
+
+
 } 

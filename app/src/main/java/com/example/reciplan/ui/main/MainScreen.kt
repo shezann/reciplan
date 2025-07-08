@@ -1,13 +1,14 @@
 package com.example.reciplan.ui.main
 
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -15,6 +16,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+
+import com.example.reciplan.ui.favorites.FavoritesScreen
 import com.example.reciplan.ui.home.HomeScreen
 import com.example.reciplan.ui.profile.ProfileScreen
 import com.example.reciplan.ui.recipe.RecipeScreen
@@ -24,9 +27,10 @@ sealed class BottomNavItem(
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
     val label: String
 ) {
-    object Home : BottomNavItem("home", Icons.Default.Home, "Home")
-    object Recipes : BottomNavItem("recipes", Icons.Default.Favorite, "Recipes")
-    object Profile : BottomNavItem("profile", Icons.Default.Person, "Profile")
+object Home : BottomNavItem("home", Icons.Filled.Home, "Home")
+    object Favorites : BottomNavItem("favorites", Icons.Filled.Favorite, "Favorites")
+    object Recipes : BottomNavItem("recipes", Icons.Filled.Add, "Recipes")
+    object Profile : BottomNavItem("profile", Icons.Filled.Person, "Profile")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,9 +46,11 @@ fun MainScreen(
     val bottomNavController = rememberNavController()
     val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val context = LocalContext.current
     
-    val bottomNavItems = listOf(
+val bottomNavItems = listOf(
         BottomNavItem.Home,
+        BottomNavItem.Favorites,
         BottomNavItem.Recipes,
         BottomNavItem.Profile
     )
@@ -96,10 +102,26 @@ fun MainScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) {
-                HomeScreen()
+                // Use new Compose HomeScreen with full functionality
+                HomeScreen(
+                    onNavigateToRecipeDetail = onNavigateToRecipeDetail,
+                    onNavigateToCreateRecipe = onNavigateToCreateRecipe,
+                    onNavigateToEditRecipe = onNavigateToEditRecipe,
+                    viewModelFactory = viewModelFactory
+                )
+            }
+            
+composable(BottomNavItem.Favorites.route) {
+                // Use new Compose FavoritesScreen
+                FavoritesScreen(
+                    onNavigateToRecipeDetail = onNavigateToRecipeDetail,
+                    onNavigateToEditRecipe = onNavigateToEditRecipe,
+                    viewModelFactory = viewModelFactory
+                )
             }
             
             composable(BottomNavItem.Recipes.route) {
+                // Keep Recipes tab using modern Compose RecipeScreen
                 RecipeScreen(
                     onNavigateToCreateRecipe = onNavigateToCreateRecipe,
                     onNavigateToRecipeDetail = onNavigateToRecipeDetail,
@@ -110,11 +132,14 @@ fun MainScreen(
             }
             
             composable(BottomNavItem.Profile.route) {
+                // Keep Profile tab using modern Compose ProfileScreen
                 ProfileScreen(
                     onNavigateToLogin = onNavigateToLogin,
                     viewModelFactory = viewModelFactory
                 )
             }
+            
+
         }
     }
 } 

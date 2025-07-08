@@ -13,33 +13,20 @@ class RecipeRepository(
     // Get recipe feed with pagination
     suspend fun getRecipeFeed(page: Int = 1, limit: Int = 10): Result<RecipeFeedResponse> {
         return try {
-            println("RecipeRepository: Getting recipe feed - page: $page, limit: $limit")
-            
             val response = recipeApi.getRecipeFeed(page, limit)
-            println("RecipeRepository: Feed response code: ${response.code()}")
-            println("RecipeRepository: Feed response headers: ${response.headers()}")
             
             if (response.isSuccessful) {
                 val body = response.body()
-                println("RecipeRepository: Feed response body: $body")
                 if (body != null) {
-                    println("RecipeRepository: Feed returned ${body.recipes.size} recipes")
-                    body.recipes.forEach { recipe ->
-                        println("RecipeRepository: Recipe - ID: ${recipe.id}, Title: ${recipe.title}, UserID: ${recipe.userId}")
-                    }
-                    Result.success(body)
+                    return Result.success(body)
                 } else {
-                    println("RecipeRepository: Empty response body despite successful feed response")
-                    Result.failure(Exception("Empty response body"))
+                    return Result.failure(Exception("Empty response body"))
                 }
             } else {
                 val errorBody = response.errorBody()?.string()
-                println("RecipeRepository: Feed error response body: $errorBody")
-                Result.failure(handleError(response))
+                return Result.failure(handleError(response))
             }
         } catch (e: Exception) {
-            println("RecipeRepository: Exception getting recipe feed: ${e.message}")
-            e.printStackTrace()
             Result.failure(e)
         }
     }
@@ -66,31 +53,20 @@ class RecipeRepository(
     // Create a new recipe
     suspend fun createRecipe(request: CreateRecipeRequest): Result<Recipe> {
         return try {
-            println("RecipeRepository: Creating recipe with title: ${request.title}")
-            println("RecipeRepository: Request data: $request")
-            
             val response = recipeApi.createRecipe(request)
-            println("RecipeRepository: Response code: ${response.code()}")
-            println("RecipeRepository: Response headers: ${response.headers()}")
             
             if (response.isSuccessful) {
                 val body = response.body()
-                println("RecipeRepository: Response body: $body")
                 if (body != null) {
-                    println("RecipeRepository: Created recipe with ID: ${body.recipe.id}")
-                    Result.success(body.recipe)
+                    return Result.success(body.recipe)
                 } else {
-                    println("RecipeRepository: Empty response body despite successful response")
-                    Result.failure(Exception("Empty response body"))
+                    return Result.failure(Exception("Empty response body"))
                 }
             } else {
                 val errorBody = response.errorBody()?.string()
-                println("RecipeRepository: Error response body: $errorBody")
-                Result.failure(handleError(response))
+                return Result.failure(handleError(response))
             }
         } catch (e: Exception) {
-            println("RecipeRepository: Exception creating recipe: ${e.message}")
-            e.printStackTrace()
             Result.failure(e)
         }
     }
@@ -98,31 +74,20 @@ class RecipeRepository(
     // Update existing recipe
     suspend fun updateRecipe(recipeId: String, request: UpdateRecipeRequest): Result<Recipe> {
         return try {
-            println("RecipeRepository: Updating recipe with ID: $recipeId")
-            println("RecipeRepository: Update request data: $request")
-            
             val response = recipeApi.updateRecipe(recipeId, request)
-            println("RecipeRepository: Update response code: ${response.code()}")
-            println("RecipeRepository: Update response headers: ${response.headers()}")
             
             if (response.isSuccessful) {
                 val body = response.body()
-                println("RecipeRepository: Update response body: $body")
                 if (body != null) {
-                    println("RecipeRepository: Updated recipe with ID: ${body.recipe.id}")
-                    Result.success(body.recipe)
+                    return Result.success(body.recipe)
                 } else {
-                    println("RecipeRepository: Empty response body despite successful update response")
-                    Result.failure(Exception("Empty response body"))
+                    return Result.failure(Exception("Empty response body"))
                 }
             } else {
                 val errorBody = response.errorBody()?.string()
-                println("RecipeRepository: Update error response body: $errorBody")
-                Result.failure(handleError(response))
+                return Result.failure(handleError(response))
             }
         } catch (e: Exception) {
-            println("RecipeRepository: Exception updating recipe: ${e.message}")
-            e.printStackTrace()
             Result.failure(e)
         }
     }
@@ -130,29 +95,20 @@ class RecipeRepository(
     // Delete recipe
     suspend fun deleteRecipe(recipeId: String): Result<String> {
         return try {
-            println("RecipeRepository: Deleting recipe with ID: $recipeId")
-            
             val response = recipeApi.deleteRecipe(recipeId)
-            println("RecipeRepository: Delete response code: ${response.code()}")
             
             if (response.isSuccessful) {
                 val body = response.body()
-                println("RecipeRepository: Delete response body: $body")
                 if (body != null) {
-                    println("RecipeRepository: Successfully deleted recipe with ID: ${body.recipeId}")
-                    Result.success(body.recipeId)
+                    return Result.success(body.recipeId)
                 } else {
-                    println("RecipeRepository: Empty response body despite successful delete response")
-                    Result.failure(Exception("Empty response body"))
+                    return Result.failure(Exception("Empty response body"))
                 }
             } else {
                 val errorBody = response.errorBody()?.string()
-                println("RecipeRepository: Delete error response body: $errorBody")
-                Result.failure(handleError(response))
+                return Result.failure(handleError(response))
             }
         } catch (e: Exception) {
-            println("RecipeRepository: Exception deleting recipe: ${e.message}")
-            e.printStackTrace()
             Result.failure(e)
         }
     }
@@ -164,7 +120,7 @@ class RecipeRepository(
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    Result.success(body.recipeId)
+                    Result.success(body.recipeId ?: recipeId)
                 } else {
                     Result.failure(Exception("Empty response body"))
                 }
@@ -183,7 +139,7 @@ class RecipeRepository(
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    Result.success(body.recipeId)
+                    Result.success(body.recipeId ?: recipeId)
                 } else {
                     Result.failure(Exception("Empty response body"))
                 }
@@ -195,6 +151,32 @@ class RecipeRepository(
         }
     }
     
+    // Search recipes
+    suspend fun searchRecipes(query: String, category: String = "", page: Int = 1, limit: Int = 10): Result<RecipeFeedResponse> {
+        return try {
+            val searchRequest = RecipeSearchRequest(
+                query = query,
+                category = category.takeIf { it.isNotEmpty() },
+                page = page,
+                limit = limit
+            )
+            
+            val response = recipeApi.searchRecipes(searchRequest)
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null) {
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                Result.failure(handleError(response))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     // Get saved recipes
     suspend fun getSavedRecipes(page: Int = 1, limit: Int = 10): Result<SavedRecipesResponse> {
         return try {

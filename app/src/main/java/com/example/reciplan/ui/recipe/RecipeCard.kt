@@ -69,17 +69,14 @@ fun RecipeCard(
                     .height(200.dp)
             ) {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(recipe.videoThumbnail ?: "https://via.placeholder.com/400x200/E0E0E0/757575?text=Recipe+Image")
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Recipe image for ${recipe.title}",
+                    model = recipe.video_thumbnail,
+                    contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
                     contentScale = ContentScale.Crop,
-                    error = painterResource(R.drawable.ic_launcher_foreground), // Fallback image
-                    placeholder = painterResource(R.drawable.ic_launcher_foreground)
+                    placeholder = painterResource(id = android.R.drawable.ic_menu_gallery),
+                    error = painterResource(id = android.R.drawable.ic_menu_gallery)
                 )
                 
                 // Bookmark/Save Button
@@ -113,11 +110,20 @@ fun RecipeCard(
                 }
                 
                 // Owner Actions Menu
-                // Debug logging
                 val firebaseUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-                println("RecipeCard DEBUG: Recipe '${recipe.title}' - isOwner: $isOwner, recipe.userId: ${recipe.userId}, firebaseUserId: $firebaseUserId")
+                val isOwned = recipe.user_id == firebaseUserId
                 
-                if (isOwner) {
+                // Debug logging
+                if (recipe.title.contains("test", ignoreCase = true) || recipe.title.contains("Test")) {
+                    println("RecipeCard Debug for '${recipe.title}':")
+                    println("  Recipe user_id: '${recipe.user_id}'")
+                    println("  Firebase user_id: '${firebaseUserId}'")
+                    println("  Are they equal? ${recipe.user_id == firebaseUserId}")
+                    println("  Is owned? $isOwned")
+                    println("  Firebase user signed in? ${com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null}")
+                }
+                
+                if (isOwned) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopStart)
@@ -239,7 +245,7 @@ fun RecipeCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "⏱ ${recipe.prepTime + recipe.cookTime} min",
+                        text = "⏱ ${recipe.prep_time + recipe.cook_time} min",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

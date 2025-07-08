@@ -137,9 +137,9 @@ fun RecipeScreenDebug(
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
                     displayRecipes.take(3).forEach { recipe ->
-                        val isOwner = effectiveUserId != null && recipe.userId == effectiveUserId
+                        val isOwner = recipe.user_id == FirebaseAuth.getInstance().currentUser?.uid
                         Text(
-                            text = "• ${recipe.title}: userId=${recipe.userId}, isOwner=$isOwner",
+                            text = "• ${recipe.title}: user_id=${recipe.user_id}, isOwner=$isOwner",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
@@ -151,15 +151,14 @@ fun RecipeScreenDebug(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                                    Button(
-                    onClick = { 
-                        println("RecipeScreenDebug: Adding test recipes with effective user ID: $effectiveUserId")
-                        viewModel.seedRecipes() 
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Add Test Recipes")
-                }
+                    Button(
+                        onClick = { 
+                            viewModel.seedRecipes() 
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Add Test Recipes")
+                    }
                     Button(
                         onClick = { viewModel.refreshRecipes() },
                         modifier = Modifier.weight(1f)
@@ -343,15 +342,12 @@ fun RecipeScreenDebug(
                             onUnsaveClick = { viewModel.unsaveRecipe(it) },
                             onEditClick = onNavigateToEditRecipe,
                             onDeleteClick = { recipeId ->
-                                println("RecipeScreenDebug: Delete clicked for recipe ID: $recipeId")
                                 recipeToDelete = displayRecipes.find { it.id == recipeId }
-                                println("RecipeScreenDebug: Found recipe to delete: ${recipeToDelete?.title}")
                                 showDeleteDialog = true
-                                println("RecipeScreenDebug: Delete dialog should be shown: $showDeleteDialog")
                             },
                             isSaved = false, // You would check this against saved recipes
                             // Show actual ownership status for debugging
-                            isOwner = effectiveUserId != null && recipe.userId == effectiveUserId
+                            isOwner = recipe.user_id == FirebaseAuth.getInstance().currentUser?.uid
                         )
                     }
                     
@@ -385,9 +381,7 @@ fun RecipeScreenDebug(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        println("RecipeScreenDebug: Delete confirmed for recipe: ${recipeToDelete?.title}")
                         recipeToDelete?.let { recipe ->
-                            println("RecipeScreenDebug: Calling viewModel.deleteRecipe with ID: ${recipe.id}")
                             viewModel.deleteRecipe(recipe.id)
                         }
                         showDeleteDialog = false

@@ -1,215 +1,248 @@
 package com.example.reciplan.ui.home
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.reciplan.data.api.RecipeApi
+import com.example.reciplan.data.recipe.RecipeRepository
 import com.example.reciplan.data.model.Recipe
-import com.example.reciplan.data.model.RecipeSearchRequest
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+data class HomeUiState(
+    val recipes: List<Recipe> = emptyList(),
+    val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val error: String? = null,
+    val hasMorePages: Boolean = true,
+    val searchQuery: String = "",
+    val selectedTab: Int = 0
+)
+
 class HomeViewModel(
-    private val recipeApi: RecipeApi
+    private val recipeRepository: RecipeRepository
 ) : ViewModel() {
 
-    private val _recipes = MutableLiveData<List<Recipe>>()
-    val recipes: LiveData<List<Recipe>> = _recipes
-
-    private val _isLoading = MutableLiveData<Boolean>()
-    val isLoading: LiveData<Boolean> = _isLoading
-
-    private val _isRefreshing = MutableLiveData<Boolean>()
-    val isRefreshing: LiveData<Boolean> = _isRefreshing
-
-    private val _error = MutableLiveData<String>()
-    val error: LiveData<String> = _error
-
-    private val _isLoadingMore = MutableLiveData<Boolean>()
-    val isLoadingMore: LiveData<Boolean> = _isLoadingMore
-
-    private val _hasMorePages = MutableLiveData<Boolean>()
-    val hasMorePages: LiveData<Boolean> = _hasMorePages
+    // StateFlow for Compose - primary state management
+    private val _uiState = MutableStateFlow(HomeUiState())
+    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     private var currentPage = 1
     private var isSearchMode = false
     private var currentSearchQuery = ""
+    private var currentCategory = ""
+
+    private val categories = listOf("", "Breakfast", "Lunch", "Dinner")
 
     init {
         loadRecipes()
     }
 
-    fun loadRecipes() {
-        if (_isLoading.value == true || _isRefreshing.value == true) return
-
-        _isLoading.value = true
-        _error.value = ""
-
-        viewModelScope.launch {
-            try {
-                val response = recipeApi.getRecipeFeed(page = 1, limit = 10)
-                if (response.isSuccessful) {
-                    val feedResponse = response.body()
-                    if (feedResponse != null) {
-                        _recipes.value = feedResponse.recipes
-                        _hasMorePages.value = feedResponse.has_next
-                        currentPage = 1
-                        isSearchMode = false
-                    }
-                } else {
-                    _error.value = "Failed to load recipes: ${response.message()}"
-                }
-            } catch (e: Exception) {
-                _error.value = "Network error: ${e.message}"
-            } finally {
-                _isLoading.value = false
-            }
+    fun updateSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        
+        if (query.trim().isEmpty()) {
+            isSearchMode = false
+            val category = categories[_uiState.value.selectedTab]
+            loadRecipes(category)
+        } else {
+            searchRecipes(query, categories[_uiState.value.selectedTab])
         }
     }
 
-    fun refreshRecipes() {
-        if (_isLoading.value == true || _isRefreshing.value == true) return
+    fun selectTab(tabIndex: Int) {
+        _uiState.value = _uiState.value.copy(selectedTab = tabIndex)
+        val category = categories[tabIndex]
+        
+        if (_uiState.value.searchQuery.trim().isEmpty()) {
+            loadRecipes(category)
+        } else {
+            searchRecipes(_uiState.value.searchQuery, category)
+        }
+    }
 
-        _isRefreshing.value = true
-        _error.value = ""
+    fun loadRecipes(category: String = "") {
+        if (_uiState.value.isLoading || _uiState.value.isRefreshing) return
+
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        
+        currentCategory = category
+        isSearchMode = false
 
         viewModelScope.launch {
-            try {
-                val response = if (isSearchMode) {
-                    recipeApi.searchRecipes(RecipeSearchRequest(query = currentSearchQuery, page = 1, limit = 10))
-                } else {
-                    recipeApi.getRecipeFeed(page = 1, limit = 10)
-                }
-
-                if (response.isSuccessful) {
-                    val feedResponse = response.body()
-                    if (feedResponse != null) {
-                        _recipes.value = feedResponse.recipes
-                        _hasMorePages.value = feedResponse.has_next
-                        currentPage = 1
+            recipeRepository.getRecipeFeed(page = 1, limit = 20).fold(
+                onSuccess = { response ->
+                    val filteredRecipes = if (category.isNotEmpty()) {
+                        response.recipes.filter { recipe ->
+                            recipe.tags.any { tag -> tag.contains(category, ignoreCase = true) }
+                        }
+                    } else {
+                        response.recipes
                     }
-                } else {
-                    _error.value = "Failed to refresh recipes: ${response.message()}"
+                    
+                    _uiState.value = _uiState.value.copy(
+                        recipes = filteredRecipes,
+                        isLoading = false,
+                        hasMorePages = response.has_next ?: (response.recipes.size >= 10)
+                    )
+                    
+                    currentPage = 1
+                    isSearchMode = false
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = error.message ?: "Failed to load recipes"
+                    )
                 }
-            } catch (e: Exception) {
-                _error.value = "Network error: ${e.message}"
-            } finally {
-                _isRefreshing.value = false
+            )
+        }
+    }
+
+    fun searchRecipes(query: String, category: String = "") {
+        if (_uiState.value.isLoading) return
+
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        
+        currentSearchQuery = query
+        currentCategory = category
+        isSearchMode = true
+
+        viewModelScope.launch {
+            recipeRepository.searchRecipes(query, category).fold(
+                onSuccess = { response ->
+                    _uiState.value = _uiState.value.copy(
+                        recipes = response.recipes,
+                        isLoading = false,
+                        hasMorePages = response.has_next ?: false
+                    )
+                    
+                    currentPage = 1
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = error.message ?: "Failed to search recipes"
+                    )
+                }
+            )
+        }
+    }
+
+    fun refresh() {
+        _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
+
+        viewModelScope.launch {
+            val result = if (isSearchMode) {
+                recipeRepository.searchRecipes(currentSearchQuery, currentCategory)
+            } else {
+                recipeRepository.getRecipeFeed(page = 1, limit = 20)
             }
+            
+            result.fold(
+                onSuccess = { response ->
+                    val filteredRecipes = if (currentCategory.isNotEmpty() && !isSearchMode) {
+                        response.recipes.filter { recipe ->
+                            recipe.tags.any { tag -> tag.contains(currentCategory, ignoreCase = true) }
+                        }
+                    } else {
+                        response.recipes
+                    }
+                    
+                    _uiState.value = _uiState.value.copy(
+                        recipes = filteredRecipes,
+                        isRefreshing = false,
+                        hasMorePages = response.has_next ?: (response.recipes.size >= 10)
+                    )
+                    
+                    currentPage = 1
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isRefreshing = false,
+                        error = error.message ?: "Failed to refresh recipes"
+                    )
+                }
+            )
         }
     }
 
     fun loadMoreRecipes() {
-        if (_isLoadingMore.value == true || _hasMorePages.value == false) return
+        if (_uiState.value.isLoadingMore || !_uiState.value.hasMorePages) return
 
-        _isLoadingMore.value = true
+        _uiState.value = _uiState.value.copy(isLoadingMore = true)
 
         viewModelScope.launch {
-            try {
-                val nextPage = currentPage + 1
-                val response = if (isSearchMode) {
-                    recipeApi.searchRecipes(RecipeSearchRequest(query = currentSearchQuery, page = nextPage, limit = 10))
-                } else {
-                    recipeApi.getRecipeFeed(page = nextPage, limit = 10)
-                }
-
-                if (response.isSuccessful) {
-                    val feedResponse = response.body()
-                    if (feedResponse != null) {
-                        val currentList = _recipes.value ?: emptyList()
-                        _recipes.value = currentList + feedResponse.recipes
-                        _hasMorePages.value = feedResponse.has_next
-                        currentPage = nextPage
-                    }
-                } else {
-                    _error.value = "Failed to load more recipes: ${response.message()}"
-                }
-            } catch (e: Exception) {
-                _error.value = "Network error: ${e.message}"
-            } finally {
-                _isLoadingMore.value = false
+            val nextPage = currentPage + 1
+            val result = if (isSearchMode) {
+                recipeRepository.searchRecipes(currentSearchQuery, currentCategory, nextPage)
+            } else {
+                recipeRepository.getRecipeFeed(page = nextPage, limit = 20)
             }
+            
+            result.fold(
+                onSuccess = { response ->
+                    val filteredRecipes = if (currentCategory.isNotEmpty() && !isSearchMode) {
+                        response.recipes.filter { recipe ->
+                            recipe.tags.any { tag -> tag.contains(currentCategory, ignoreCase = true) }
+                        }
+                    } else {
+                        response.recipes
+                    }
+                    
+                    val updatedRecipes = _uiState.value.recipes + filteredRecipes
+                    
+                    _uiState.value = _uiState.value.copy(
+                        recipes = updatedRecipes,
+                        isLoadingMore = false,
+                        hasMorePages = response.has_next ?: (response.recipes.size >= 10)
+                    )
+                    
+                    currentPage = nextPage
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingMore = false,
+                        error = error.message ?: "Failed to load more recipes"
+                    )
+                }
+            )
         }
     }
 
-    fun searchRecipes(query: String) {
-        if (query.trim().isEmpty()) {
-            // If search is empty, load regular feed
-            isSearchMode = false
-            loadRecipes()
-            return
-        }
-
-        isSearchMode = true
-        currentSearchQuery = query.trim()
-        _isLoading.value = true
-        _error.value = ""
-
+    fun saveRecipe(recipeId: String) {
         viewModelScope.launch {
-            try {
-                val response = recipeApi.searchRecipes(
-                    RecipeSearchRequest(query = currentSearchQuery, page = 1, limit = 10)
-                )
-
-                if (response.isSuccessful) {
-                    val feedResponse = response.body()
-                    if (feedResponse != null) {
-                        _recipes.value = feedResponse.recipes
-                        _hasMorePages.value = feedResponse.has_next
-                        currentPage = 1
-                    }
-                } else {
-                    _error.value = "Failed to search recipes: ${response.message()}"
+            recipeRepository.saveRecipe(recipeId).fold(
+                onSuccess = {
+                    // Recipe saved successfully
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        error = error.message ?: "Failed to save recipe"
+                    )
                 }
-            } catch (e: Exception) {
-                _error.value = "Network error: ${e.message}"
-            } finally {
-                _isLoading.value = false
-            }
+            )
         }
     }
 
-    fun saveRecipe(recipe: Recipe) {
+    fun unsaveRecipe(recipeId: String) {
         viewModelScope.launch {
-            try {
-                val response = recipeApi.saveRecipe(recipe.id)
-                if (response.isSuccessful) {
-                    // Update local state
-                    val currentList = _recipes.value ?: emptyList()
-                    val updatedList = currentList.map { 
-                        if (it.id == recipe.id) {
-                            it.copy(saved_by = it.saved_by + "current_user_id")
-                        } else it
-                    }
-                    _recipes.value = updatedList
-                } else {
-                    _error.value = "Failed to save recipe"
+            recipeRepository.unsaveRecipe(recipeId).fold(
+                onSuccess = {
+                    // Recipe unsaved successfully
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        error = error.message ?: "Failed to unsave recipe"
+                    )
                 }
-            } catch (e: Exception) {
-                _error.value = "Network error: ${e.message}"
-            }
+            )
         }
     }
 
-    fun unsaveRecipe(recipe: Recipe) {
-        viewModelScope.launch {
-            try {
-                val response = recipeApi.unsaveRecipe(recipe.id)
-                if (response.isSuccessful) {
-                    // Update local state
-                    val currentList = _recipes.value ?: emptyList()
-                    val updatedList = currentList.map { 
-                        if (it.id == recipe.id) {
-                            it.copy(saved_by = it.saved_by - "current_user_id")
-                        } else it
-                    }
-                    _recipes.value = updatedList
-                } else {
-                    _error.value = "Failed to unsave recipe"
-                }
-            } catch (e: Exception) {
-                _error.value = "Network error: ${e.message}"
-            }
-        }
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
     }
 }

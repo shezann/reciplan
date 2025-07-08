@@ -1,91 +1,174 @@
 package com.example.reciplan.ui.recipe
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.reciplan.data.api.RecipeApi
+import com.example.reciplan.data.recipe.RecipeRepository
 import com.example.reciplan.data.model.Recipe
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+data class RecipeDetailUiState(
+    val recipe: Recipe? = null,
+    val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val error: String? = null,
+    val successMessage: String? = null,
+    val isSaved: Boolean = false
+)
+
 class RecipeDetailViewModel(
-    private val recipeApi: RecipeApi,
+    private val recipeRepository: RecipeRepository,
     private val recipeId: String
 ) : ViewModel() {
 
-    private val _recipe = MutableLiveData<Recipe?>()
-    val recipe: LiveData<Recipe?> = _recipe
+    private val _uiState = MutableStateFlow(RecipeDetailUiState())
+    val uiState: StateFlow<RecipeDetailUiState> = _uiState.asStateFlow()
 
-    private val _isLoading = MutableLiveData<Boolean>()
-    val isLoading: LiveData<Boolean> = _isLoading
-
-    private val _error = MutableLiveData<String>()
-    val error: LiveData<String> = _error
+    private val currentUserId: String?
+        get() = FirebaseAuth.getInstance().currentUser?.uid
 
     init {
         loadRecipe()
     }
 
     private fun loadRecipe() {
-        _isLoading.value = true
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
         
         viewModelScope.launch {
-            try {
-                val response = recipeApi.getRecipeDetails(recipeId)
-                if (response.isSuccessful) {
-                    _recipe.value = response.body()?.recipe
-                } else {
-                    _error.value = "Failed to load recipe: ${response.message()}"
+            recipeRepository.getRecipe(recipeId).fold(
+                onSuccess = { recipe ->
+                    val isSaved = currentUserId?.let { userId ->
+                        recipe.saved_by.contains(userId)
+                    } ?: false
+                    
+                    _uiState.value = _uiState.value.copy(
+                        recipe = recipe,
+                        isLoading = false,
+                        isSaved = isSaved,
+                        error = null
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = error.message ?: "Failed to load recipe"
+                    )
                 }
-            } catch (e: Exception) {
-                _error.value = "Network error: ${e.message}"
-            } finally {
-                _isLoading.value = false
-            }
+            )
         }
     }
 
     fun saveRecipe() {
-        val currentRecipe = _recipe.value ?: return
+        val userId = currentUserId
+        if (userId == null) {
+            _uiState.value = _uiState.value.copy(
+                error = "Please sign in to save recipes"
+            )
+            return
+        }
         
         viewModelScope.launch {
-            try {
-                val response = recipeApi.saveRecipe(recipeId)
-                if (response.isSuccessful) {
-                    // Update local state
-                    _recipe.value = currentRecipe.copy(
-                        saved_by = currentRecipe.saved_by + "current_user_id"
+            recipeRepository.saveRecipe(recipeId).fold(
+                onSuccess = {
+                    // Update local state optimistically
+                    val currentRecipe = _uiState.value.recipe
+                    if (currentRecipe != null) {
+                        val updatedSavedBy = currentRecipe.saved_by.toMutableList()
+                        if (!updatedSavedBy.contains(userId)) {
+                            updatedSavedBy.add(userId)
+                        }
+                        val updatedRecipe = currentRecipe.copy(saved_by = updatedSavedBy)
+                        
+                        _uiState.value = _uiState.value.copy(
+                            recipe = updatedRecipe,
+                            isSaved = true,
+                            successMessage = "Recipe saved to your collection!"
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        error = error.message ?: "Failed to save recipe"
                     )
-                } else {
-                    _error.value = "Failed to save recipe: ${response.message()}"
                 }
-            } catch (e: Exception) {
-                _error.value = "Network error: ${e.message}"
-            }
+            )
         }
     }
 
     fun unsaveRecipe() {
-        val currentRecipe = _recipe.value ?: return
+        val userId = currentUserId
+        if (userId == null) {
+            _uiState.value = _uiState.value.copy(
+                error = "Please sign in to manage saved recipes"
+            )
+            return
+        }
         
         viewModelScope.launch {
-            try {
-                val response = recipeApi.unsaveRecipe(recipeId)
-                if (response.isSuccessful) {
-                    // Update local state
-                    _recipe.value = currentRecipe.copy(
-                        saved_by = currentRecipe.saved_by - "current_user_id"
+            recipeRepository.unsaveRecipe(recipeId).fold(
+                onSuccess = {
+                    // Update local state optimistically
+                    val currentRecipe = _uiState.value.recipe
+                    if (currentRecipe != null) {
+                        val updatedSavedBy = currentRecipe.saved_by.toMutableList()
+                        updatedSavedBy.remove(userId)
+                        val updatedRecipe = currentRecipe.copy(saved_by = updatedSavedBy)
+                        
+                        _uiState.value = _uiState.value.copy(
+                            recipe = updatedRecipe,
+                            isSaved = false,
+                            successMessage = "Recipe removed from your collection!"
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        error = error.message ?: "Failed to unsave recipe"
                     )
-                } else {
-                    _error.value = "Failed to unsave recipe: ${response.message()}"
                 }
-            } catch (e: Exception) {
-                _error.value = "Network error: ${e.message}"
-            }
+            )
         }
     }
 
     fun refresh() {
-        loadRecipe()
+        _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
+        
+        viewModelScope.launch {
+            recipeRepository.getRecipe(recipeId).fold(
+                onSuccess = { recipe ->
+                    val isSaved = currentUserId?.let { userId ->
+                        recipe.saved_by.contains(userId)
+                    } ?: false
+                    
+                    _uiState.value = _uiState.value.copy(
+                        recipe = recipe,
+                        isRefreshing = false,
+                        isSaved = isSaved,
+                        error = null
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isRefreshing = false,
+                        error = error.message ?: "Failed to refresh recipe"
+                    )
+                }
+            )
+        }
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
+    }
+    
+    fun clearSuccessMessage() {
+        _uiState.value = _uiState.value.copy(successMessage = null)
+    }
+    
+    fun clearMessages() {
+        _uiState.value = _uiState.value.copy(error = null, successMessage = null)
     }
 } 

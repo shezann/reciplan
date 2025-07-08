@@ -74,6 +74,49 @@ fun SplashScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
+        // Debug information
+        Spacer(modifier = Modifier.height(16.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "Debug Info:",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Auth State: ${authState::class.simpleName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Health State: ${healthState::class.simpleName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                // Debug button to force logout
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { 
+                        authViewModel.forceLogout()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Force Logout & Show Login")
+                }
+            }
+        }
+
         // Show error if health check fails
         if (healthState is HealthState.Error) {
             val errorState = healthState as HealthState.Error
