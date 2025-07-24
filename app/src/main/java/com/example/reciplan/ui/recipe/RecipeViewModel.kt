@@ -35,65 +35,24 @@ class RecipeViewModel(
     
     // Load recipes from the feed
     fun loadRecipes(refresh: Boolean = false) {
-        println("RecipeViewModel: loadRecipes called - refresh: $refresh")
-        
         if (refresh) {
-            println("RecipeViewModel: Refreshing - resetting page to 1")
             currentPage = 1
             isLastPage = false
             _recipeFeed.value = emptyList()
         }
-        
-        if (_uiState.value.isLoading || isLastPage) {
-            println("RecipeViewModel: Skipping load - isLoading: ${_uiState.value.isLoading}, isLastPage: $isLastPage")
-            return
-        }
-        
+        if (_uiState.value.isLoading || isLastPage) return
         viewModelScope.launch {
-            println("RecipeViewModel: Starting recipe load for page: $currentPage")
             _uiState.value = _uiState.value.copy(isLoading = true)
-            
             recipeRepository.getRecipeFeed(currentPage, 10).fold(
                 onSuccess = { response ->
-                    println("RecipeViewModel: Successfully loaded ${response.recipes.size} recipes")
-                    
-                    // Debug: Print details of each recipe
-                    response.recipes.forEachIndexed { index, recipe ->
-                        println("RecipeViewModel: Recipe $index:")
-                        println("RecipeViewModel:   - ID: ${recipe.id}")
-                        println("RecipeViewModel:   - Title: ${recipe.title}")
-                        println("RecipeViewModel:   - UserId: ${recipe.userId}")
-                        println("RecipeViewModel:   - SourcePlatform: '${recipe.sourcePlatform}' (null? ${recipe.sourcePlatform == null}, blank? ${recipe.sourcePlatform.isNullOrBlank()})")
-                    }
-                    
-                    val newRecipes = if (refresh) {
-                        response.recipes
-                    } else {
-                        _recipeFeed.value + response.recipes
-                    }
-                    
-                    println("RecipeViewModel: Total recipes in feed: ${newRecipes.size}")
-                    
-                    // Debug: Count user-created recipes
-                    val userCreatedCount = newRecipes.count { it.sourcePlatform.isNullOrBlank() }
-                    println("RecipeViewModel: User-created recipes (sourcePlatform null/blank): $userCreatedCount")
-                    
+                    val newRecipes = if (refresh) response.recipes else _recipeFeed.value + response.recipes
                     _recipeFeed.value = newRecipes
                     currentPage++
                     isLastPage = response.recipes.size < 10
-                    
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = null
-                    )
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = null)
                 },
                 onFailure = { error ->
-                    println("RecipeViewModel: Failed to load recipes: ${error.message}")
-                    error.printStackTrace()
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = error.message
-                    )
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = error.message)
                 }
             )
         }
@@ -134,146 +93,80 @@ class RecipeViewModel(
     
     // Helper function to check if a recipe matches the current filter criteria
     private fun recipeMatchesCurrentFilter(recipe: Recipe): Boolean {
-        val currentUiState = _uiState.value
-        return when (currentUiState.selectedFilter) {
+        val state = _uiState.value
+        val filterMatch = when (state.selectedFilter) {
             "All", "" -> true
-            "My Recipes" -> recipe.userId == "IbMRwrirqeyObTyqc9Aa" // Current user's ID
-            else -> recipe.tags.any { it.equals(currentUiState.selectedFilter, ignoreCase = true) }
-        } && (currentUiState.searchQuery.isEmpty() || 
-               recipe.title.contains(currentUiState.searchQuery, ignoreCase = true) ||
-               recipe.description?.contains(currentUiState.searchQuery, ignoreCase = true) == true ||
-               recipe.tags.any { it.contains(currentUiState.searchQuery, ignoreCase = true) })
+            "My Recipes" -> recipe.userId == "IbMRwrirqeyObTyqc9Aa"
+            else -> recipe.tags.any { it.equals(state.selectedFilter, ignoreCase = true) }
+        }
+        val searchMatch = state.searchQuery.isEmpty() ||
+            recipe.title.contains(state.searchQuery, ignoreCase = true) ||
+            recipe.description?.contains(state.searchQuery, ignoreCase = true) == true ||
+            recipe.tags.any { it.contains(state.searchQuery, ignoreCase = true) }
+        return filterMatch && searchMatch
+    }
+
+    // Helper to update filteredRecipes after any change
+    private fun updateFilteredRecipes() {
+        val state = _uiState.value
+        val shouldShowFiltered = state.filteredRecipes.isNotEmpty() || state.searchQuery.isNotEmpty() || state.selectedFilter != "All"
+        val newFiltered = if (shouldShowFiltered) {
+            _recipeFeed.value.filter { recipeMatchesCurrentFilter(it) }
+        } else {
+            emptyList()
+        }
+        _uiState.value = state.copy(filteredRecipes = newFiltered)
     }
 
     // Create new recipe
     fun createRecipe(request: CreateRecipeRequest) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            
             recipeRepository.createRecipe(request).fold(
                 onSuccess = { recipe ->
-                    // Add the new recipe to the feed
                     _recipeFeed.value = listOf(recipe) + _recipeFeed.value
-                    
-                    // Also add to filtered recipes if it matches current filter criteria
-                    val currentUiState = _uiState.value
-                    val updatedFilteredRecipes = if (currentUiState.filteredRecipes.isNotEmpty() || 
-                                                     currentUiState.searchQuery.isNotEmpty() || 
-                                                     currentUiState.selectedFilter != "All") {
-                        if (recipeMatchesCurrentFilter(recipe)) {
-                            listOf(recipe) + currentUiState.filteredRecipes
-                        } else {
-                            currentUiState.filteredRecipes
-                        }
-                    } else {
-                        currentUiState.filteredRecipes
-                    }
-                    
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = null,
-                        successMessage = "Recipe created successfully!",
-                        filteredRecipes = updatedFilteredRecipes
-                    )
+                    updateFilteredRecipes()
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = null, successMessage = "Recipe created successfully!")
                 },
                 onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = error.message
-                    )
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = error.message)
                 }
             )
         }
     }
-    
+
     // Update existing recipe
     fun updateRecipe(recipeId: String, request: UpdateRecipeRequest) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            
             recipeRepository.updateRecipe(recipeId, request).fold(
                 onSuccess = { updatedRecipe ->
-                    // Update the recipe in the feed
-                    _recipeFeed.value = _recipeFeed.value.map { recipe ->
-                        if (recipe.id == recipeId) updatedRecipe else recipe
-                    }
-                    
-                    // Also update in filtered recipes if any filters are active
-                    val currentUiState = _uiState.value
-                    val updatedFilteredRecipes = if (currentUiState.filteredRecipes.isNotEmpty() || 
-                                                     currentUiState.searchQuery.isNotEmpty() || 
-                                                     currentUiState.selectedFilter != "All") {
-                        val filteredWithoutOldRecipe = currentUiState.filteredRecipes.filter { it.id != recipeId }
-                        if (recipeMatchesCurrentFilter(updatedRecipe)) {
-                            // Recipe still matches filter, update it in the list
-                            filteredWithoutOldRecipe + updatedRecipe
-                        } else {
-                            // Recipe no longer matches filter, remove it from the list
-                            filteredWithoutOldRecipe
-                        }
-                    } else {
-                        currentUiState.filteredRecipes
-                    }
-                    
-                    // Update selected recipe if it's the one being edited
-                    if (_selectedRecipe.value?.id == recipeId) {
-                        _selectedRecipe.value = updatedRecipe
-                    }
-                    
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = null,
-                        successMessage = "Recipe updated successfully!",
-                        filteredRecipes = updatedFilteredRecipes
-                    )
+                    _recipeFeed.value = _recipeFeed.value.map { if (it.id == recipeId) updatedRecipe else it }
+                    if (_selectedRecipe.value?.id == recipeId) _selectedRecipe.value = updatedRecipe
+                    updateFilteredRecipes()
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = null, successMessage = "Recipe updated successfully!")
                 },
                 onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = error.message
-                    )
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = error.message)
                 }
             )
         }
     }
-    
+
     // Delete recipe
     fun deleteRecipe(recipeId: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            
             recipeRepository.deleteRecipe(recipeId).fold(
                 onSuccess = { deletedRecipeId ->
-                    // Remove the recipe from the feed
-                    _recipeFeed.value = _recipeFeed.value.filter { it.id != deletedRecipeId }
-                    
-                    // Also remove from filtered recipes if any filters are active
-                    val currentUiState = _uiState.value
-                    val updatedFilteredRecipes = if (currentUiState.filteredRecipes.isNotEmpty() || 
-                                                     currentUiState.searchQuery.isNotEmpty() || 
-                                                     currentUiState.selectedFilter != "All") {
-                        currentUiState.filteredRecipes.filter { it.id != deletedRecipeId }
-                    } else {
-                        currentUiState.filteredRecipes
-                    }
-                    
-                    // Clear selected recipe if it was deleted
-                    if (_selectedRecipe.value?.id == deletedRecipeId) {
-                        _selectedRecipe.value = null
-                    }
-                    
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = null,
-                        successMessage = "Recipe deleted successfully!",
-                        filteredRecipes = updatedFilteredRecipes
-                    )
+                    val newFeed = _recipeFeed.value.filter { it.id != deletedRecipeId }
+                    _recipeFeed.value = newFeed
+                    if (_selectedRecipe.value?.id == deletedRecipeId) _selectedRecipe.value = null
+                    updateFilteredRecipes()
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = null, successMessage = "Recipe deleted successfully!")
                 },
                 onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = "Failed to delete recipe: ${error.message}"
-                    )
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = "Failed to delete recipe: ${error.message}")
                 }
             )
         }
@@ -332,9 +225,6 @@ class RecipeViewModel(
     
     // Filter recipes by tags
     fun filterRecipesByTag(tag: String) {
-        println("RecipeViewModel: Filtering by tag: '$tag'")
-        println("RecipeViewModel: Total recipes available: ${_recipeFeed.value.size}")
-        
         val filteredRecipes = if (tag.isEmpty() || tag == "All") {
             _recipeFeed.value
         } else if (tag == "My Recipes") {
@@ -342,18 +232,12 @@ class RecipeViewModel(
             val userRecipes = _recipeFeed.value.filter { recipe ->
                 recipe.userId == "IbMRwrirqeyObTyqc9Aa" // Current user's ID
             }
-            println("RecipeViewModel: My Recipes filter - found ${userRecipes.size} recipes")
-            userRecipes.forEach { recipe ->
-                println("  - ${recipe.title} (sourcePlatform: '${recipe.sourcePlatform}')")
-            }
             userRecipes
         } else {
             _recipeFeed.value.filter { recipe ->
                 recipe.tags.any { it.equals(tag, ignoreCase = true) }
             }
         }
-        
-        println("RecipeViewModel: Filtered recipes count: ${filteredRecipes.size}")
         
         _uiState.value = _uiState.value.copy(
             filteredRecipes = filteredRecipes,
