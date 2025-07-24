@@ -113,6 +113,12 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
+    // Image Loading
+    implementation(libs.coil.compose)
+
+    // Accompanist
+    implementation(libs.accompanist.swiperefresh)
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

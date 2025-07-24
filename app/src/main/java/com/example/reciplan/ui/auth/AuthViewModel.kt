@@ -34,26 +34,18 @@ class AuthViewModel(
                         // Fetch the actual user data from backend
                         val userData = authRepository.getCurrentUserData()
                         if (userData != null) {
-                            _authState.value = AuthResult.Success(userData)
+                            // Set setup_complete based on whether user has a username
+                            val userWithSetupFlag = userData.copy(
+                                setup_complete = !userData.username.isNullOrBlank()
+                            )
+                            println("AuthViewModel: User data retrieved - username: ${userData.username}, setup_complete: ${userWithSetupFlag.setup_complete}")
+                            _authState.value = AuthResult.Success(userWithSetupFlag)
                         } else {
-                            // Fallback to Firebase user data if backend data is not available
-                            val firebaseUser = authRepository.getCurrentUser()
-                            if (firebaseUser != null) {
-                                _authState.value = AuthResult.Success(
-                                    com.example.reciplan.data.model.User(
-                                        id = firebaseUser.uid,
-                                        email = firebaseUser.email ?: "",
-                                        name = firebaseUser.displayName,
-                                        username = null,
-                                        photoUrl = firebaseUser.photoUrl?.toString(),
-                                        emailVerified = firebaseUser.isEmailVerified,
-                                        created_at = "",
-                                        updated_at = ""
-                                    )
-                                )
-                            } else {
-                                _authState.value = AuthResult.Error("User not authenticated")
-                            }
+                            println("AuthViewModel: Backend data not available, this shouldn't happen if authenticated")
+                            // If we're authenticated but can't get user data, there's a problem
+                            // Sign out and let the user re-authenticate
+                            authRepository.signOut()
+                            _authState.value = AuthResult.Error("Authentication failed, please sign in again")
                         }
                     }
                     is com.example.reciplan.data.auth.AuthState.Unauthenticated -> {
@@ -149,6 +141,15 @@ class AuthViewModel(
         viewModelScope.launch {
             authRepository.signOut()
             _authState.value = AuthResult.Loading
+        }
+    }
+
+    // Method to clear all authentication state and force fresh login
+    fun clearAuthenticationState() {
+        viewModelScope.launch {
+            println("AuthViewModel: Clearing all authentication state")
+            authRepository.signOut()
+            _authState.value = AuthResult.Error("Please sign in again")
         }
     }
 }
