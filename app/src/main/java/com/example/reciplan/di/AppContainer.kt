@@ -3,10 +3,12 @@ package com.example.reciplan.di
 import android.content.Context
 import com.example.reciplan.data.api.AuthApi
 import com.example.reciplan.data.api.RecipeApi
+import com.example.reciplan.data.api.IngestApi
 import com.example.reciplan.data.auth.AuthRepository
 import com.example.reciplan.data.auth.TokenManager
 import com.example.reciplan.data.network.AuthInterceptor
 import com.example.reciplan.data.recipe.RecipeRepository
+import com.example.reciplan.data.repository.IngestRepository
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -72,5 +74,13 @@ class AppContainer(private val context: Context) {
     
     val recipeRepository: RecipeRepository by lazy {
         RecipeRepository(recipeApi)
+    }
+    
+    val ingestApi: IngestApi by lazy {
+        retrofit.create(IngestApi::class.java)
+    }
+    
+    val ingestRepository: IngestRepository by lazy {
+        IngestRepository(ingestApi)
     }
 } 
