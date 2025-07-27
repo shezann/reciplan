@@ -1,12 +1,16 @@
 package com.example.reciplan.data.model
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+import kotlinx.parcelize.RawValue
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonElement
 
 // Status enum for ingest job states
+@Parcelize
 @Serializable
-enum class IngestStatus {
+enum class IngestStatus : Parcelable {
     @SerialName("QUEUED")
     QUEUED,
     
@@ -45,8 +49,9 @@ enum class IngestStatus {
 }
 
 // Error codes for ingest failures
+@Parcelize
 @Serializable
-enum class IngestErrorCode {
+enum class IngestErrorCode : Parcelable {
     @SerialName("VIDEO_UNAVAILABLE")
     VIDEO_UNAVAILABLE,
     
@@ -67,6 +72,7 @@ enum class IngestErrorCode {
 }
 
 // Main ingest job DTO
+@Parcelize
 @Serializable
 data class IngestJobDto(
     @SerialName("job_id")
@@ -85,7 +91,7 @@ data class IngestJobDto(
     val errorCode: IngestErrorCode? = null,
     
     @SerialName("recipe_json")
-    val recipeJson: JsonElement? = null,
+    val recipeJson: @RawValue JsonElement? = null,
     
     @SerialName("onscreen_text")
     val onscreenText: String? = null,
@@ -98,9 +104,10 @@ data class IngestJobDto(
     
     @SerialName("llm_error_message")
     val llmErrorMessage: String? = null
-)
+) : Parcelable
 
 // Recipe draft DTO for the extracted recipe data
+@Parcelize
 @Serializable
 data class RecipeDraftDto(
     val id: String,
@@ -127,15 +134,17 @@ data class RecipeDraftDto(
     val createdAt: String,
     @SerialName("updated_at")
     val updatedAt: String
-)
+) : Parcelable
 
 // Request DTO for starting an ingest job
+@Parcelize
 @Serializable
 data class StartIngestRequest(
     val url: String
-)
+) : Parcelable
 
 // Response DTO for starting an ingest job
+@Parcelize
 @Serializable
 data class StartIngestResponse(
     @SerialName("job_id")
@@ -147,7 +156,7 @@ data class StartIngestResponse(
     val status: IngestStatus,
     
     val message: String? = null
-)
+) : Parcelable
 
 // Helper extension functions for status checking
 fun IngestStatus.isTerminal(): Boolean {

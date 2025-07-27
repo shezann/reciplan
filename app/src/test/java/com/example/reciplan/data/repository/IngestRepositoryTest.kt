@@ -571,6 +571,56 @@ class IngestRepositoryTest {
     }
     
     @Test
+    fun `pollJob with JSON object recipe_json - parses correctly`() = runTest {
+        // Given - recipe_json as JSON object instead of string
+        val jsonObjectResponse = """
+            {
+                "job_id": "job_json_object",
+                "recipe_id": "recipe_json_object",
+                "status": "COMPLETED",
+                "title": "JSON Object Recipe",
+                "transcript": "Recipe with JSON object",
+                "error_code": null,
+                "recipe_json": {
+                    "title": "Pasta Recipe",
+                    "ingredients": [
+                        {"name": "pasta", "quantity": "200g"},
+                        {"name": "tomatoes", "quantity": "3 pieces"}
+                    ],
+                    "instructions": ["Boil pasta", "Add tomatoes"],
+                    "prep_time": 15,
+                    "cook_time": 20
+                },
+                "onscreen_text": "Fresh pasta recipe",
+                "ingredient_candidates": ["pasta", "tomatoes", "basil"],
+                "parse_errors": [],
+                "llm_error_message": null
+            }
+        """.trimIndent()
+        
+        mockWebServer.enqueue(MockResponse()
+            .setResponseCode(200)
+            .setBody(jsonObjectResponse)
+            .addHeader("Content-Type", "application/json"))
+        
+        // When
+        val result = ingestRepository.pollJob("job_json_object")
+        
+        // Then
+        assertTrue(result.isSuccess)
+        val job = result.getOrNull()
+        assertNotNull(job)
+        assertEquals("job_json_object", job?.jobId)
+        assertEquals("recipe_json_object", job?.recipeId)
+        assertEquals(IngestStatus.COMPLETED, job?.status)
+        assertEquals("JSON Object Recipe", job?.title)
+        assertEquals("Fresh pasta recipe", job?.onscreenText)
+        assertEquals(listOf("pasta", "tomatoes", "basil"), job?.ingredientCandidates)
+        assertNotNull(job?.recipeJson) // JSON object should be parsed as JsonElement
+        assertTrue(job?.parseErrors?.isEmpty() == true)
+    }
+
+    @Test
     fun `getActiveJobCount success - returns correct count`() = runTest {
         // Given
         val activeJobsResponse = """

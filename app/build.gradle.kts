@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    id("kotlin-parcelize")
     alias(libs.plugins.google.services)
     // Temporarily disabled for testing
     // alias(libs.plugins.hilt)

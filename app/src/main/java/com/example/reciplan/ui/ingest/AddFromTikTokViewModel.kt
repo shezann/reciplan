@@ -26,6 +26,13 @@ data class AddFromTikTokUiState(
     val jobStatus: IngestStatus? = null,
     val jobDetails: IngestJobDto? = null,
     val isPolling: Boolean = false,
+    // Progress indicator fields (Task 4.4)
+    val currentStep: Int = 0,
+    val totalSteps: Int = 10,
+    val stepTitle: String = "",
+    val stepDescription: String = "",
+    val isComplete: Boolean = false,
+    val hasError: Boolean = false,
     // Error handling fields
     val errorCode: IngestErrorCode? = null,
     val showErrorSnackbar: Boolean = false,
@@ -114,12 +121,136 @@ class AddFromTikTokViewModel(
     }
     
     /**
+     * Data class for status UI mapping information
+     */
+    private data class StatusUiInfo(
+        val step: Int,
+        val totalSteps: Int,
+        val title: String,
+        val description: String,
+        val isComplete: Boolean,
+        val hasError: Boolean
+    )
+
+    /**
+     * Map IngestStatus to UI state information for progress indicator
+     */
+    private fun mapStatusToUiState(status: IngestStatus): StatusUiInfo {
+        return when (status) {
+            IngestStatus.QUEUED -> StatusUiInfo(
+                step = 1,
+                totalSteps = 10,
+                title = "Queued",
+                description = "Your recipe is in the processing queue",
+                isComplete = false,
+                hasError = false
+            )
+            IngestStatus.DOWNLOADING -> StatusUiInfo(
+                step = 2,
+                totalSteps = 10,
+                title = "Downloading",
+                description = "Downloading video from TikTok",
+                isComplete = false,
+                hasError = false
+            )
+            IngestStatus.EXTRACTING -> StatusUiInfo(
+                step = 3,
+                totalSteps = 10,
+                title = "Extracting",
+                description = "Extracting audio and video content",
+                isComplete = false,
+                hasError = false
+            )
+            IngestStatus.TRANSCRIBING -> StatusUiInfo(
+                step = 4,
+                totalSteps = 10,
+                title = "Transcribing",
+                description = "Converting speech to text",
+                isComplete = false,
+                hasError = false
+            )
+            IngestStatus.DRAFT_TRANSCRIBED -> StatusUiInfo(
+                step = 5,
+                totalSteps = 10,
+                title = "Transcription Complete",
+                description = "Audio transcription finished",
+                isComplete = false,
+                hasError = false
+            )
+            IngestStatus.OCRING -> StatusUiInfo(
+                step = 6,
+                totalSteps = 10,
+                title = "Reading Text",
+                description = "Extracting text from video frames",
+                isComplete = false,
+                hasError = false
+            )
+            IngestStatus.OCR_DONE -> StatusUiInfo(
+                step = 7,
+                totalSteps = 10,
+                title = "Text Extraction Complete",
+                description = "On-screen text has been captured",
+                isComplete = false,
+                hasError = false
+            )
+            IngestStatus.LLM_REFINING -> StatusUiInfo(
+                step = 8,
+                totalSteps = 10,
+                title = "AI Processing",
+                description = "Creating your recipe with AI",
+                isComplete = false,
+                hasError = false
+            )
+            IngestStatus.DRAFT_PARSED -> StatusUiInfo(
+                step = 9,
+                totalSteps = 10,
+                title = "Recipe Generated",
+                description = "Your recipe draft is ready",
+                isComplete = false,
+                hasError = false
+            )
+            IngestStatus.DRAFT_PARSED_WITH_ERRORS -> StatusUiInfo(
+                step = 9,
+                totalSteps = 10,
+                title = "Recipe Generated (with warnings)",
+                description = "Recipe created but may need review",
+                isComplete = false,
+                hasError = false
+            )
+            IngestStatus.COMPLETED -> StatusUiInfo(
+                step = 10,
+                totalSteps = 10,
+                title = "Complete",
+                description = "Your recipe is ready to view!",
+                isComplete = true,
+                hasError = false
+            )
+            IngestStatus.FAILED -> StatusUiInfo(
+                step = 0,
+                totalSteps = 10,
+                title = "Failed",
+                description = "Something went wrong processing your video",
+                isComplete = false,
+                hasError = true
+            )
+        }
+    }
+
+    /**
      * Update job status from polling results
      */
     fun updateJobStatus(jobDetails: IngestJobDto) {
+        val statusInfo = mapStatusToUiState(jobDetails.status)
+        
         _uiState.value = _uiState.value.copy(
             jobStatus = jobDetails.status,
-            jobDetails = jobDetails
+            jobDetails = jobDetails,
+            currentStep = statusInfo.step,
+            totalSteps = statusInfo.totalSteps,
+            stepTitle = statusInfo.title,
+            stepDescription = statusInfo.description,
+            isComplete = statusInfo.isComplete,
+            hasError = statusInfo.hasError
         )
         
         // Fire telemetry events for terminal states
@@ -288,6 +419,41 @@ class AddFromTikTokViewModel(
         _uiState.value = _uiState.value.copy(isPolling = false)
     }
     
+    /**
+     * Get current progress as a percentage (0.0 to 1.0)
+     */
+    fun getProgressPercentage(): Float {
+        val currentState = _uiState.value
+        return if (currentState.totalSteps > 0) {
+            currentState.currentStep.toFloat() / currentState.totalSteps.toFloat()
+        } else {
+            0f
+        }
+    }
+
+    /**
+     * Get progress text for display (e.g., "Step 3 of 10")
+     */
+    fun getProgressText(): String {
+        val currentState = _uiState.value
+        return if (currentState.hasError) {
+            "Processing failed"
+        } else if (currentState.isComplete) {
+            "Complete!"
+        } else {
+            "Step ${currentState.currentStep} of ${currentState.totalSteps}"
+        }
+    }
+
+    /**
+     * Check if the current status allows for retry
+     */
+    fun canRetryCurrentStatus(): Boolean {
+        val currentState = _uiState.value
+        return currentState.hasError && currentState.errorCode != null && 
+               ErrorMapper.isRecoverable(currentState.errorCode)
+    }
+
     /**
      * Cancel current ingest job (for when user navigates away)
      */
