@@ -4,6 +4,10 @@ import com.example.reciplan.data.api.RecipeApi
 import com.example.reciplan.data.model.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import retrofit2.Response
 
 class RecipeRepository(
@@ -125,6 +129,72 @@ class RecipeRepository(
             e.printStackTrace()
             Result.failure(e)
         }
+    }
+    
+    // Save recipe draft with JSON patch
+    suspend fun saveDraft(recipeId: String, jsonPatch: JsonObject): Result<Recipe> {
+        return try {
+            println("RecipeRepository: Saving draft for recipe ID: $recipeId")
+            println("RecipeRepository: JSON patch: $jsonPatch")
+            
+            // Convert JsonObject patch to UpdateRecipeRequest
+            val updateRequest = convertJsonPatchToUpdateRequest(jsonPatch)
+            println("RecipeRepository: Converted to UpdateRecipeRequest: $updateRequest")
+            
+            val response = recipeApi.updateRecipe(recipeId, updateRequest)
+            println("RecipeRepository: Save draft response code: ${response.code()}")
+            println("RecipeRepository: Save draft response headers: ${response.headers()}")
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                println("RecipeRepository: Save draft response body: $body")
+                if (body != null) {
+                    println("RecipeRepository: Successfully saved draft for recipe ID: ${body.recipe.id}")
+                    Result.success(body.recipe)
+                } else {
+                    println("RecipeRepository: Empty response body despite successful save draft response")
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                val errorBody = response.errorBody()?.string()
+                println("RecipeRepository: Save draft error response body: $errorBody")
+                Result.failure(handleError(response))
+            }
+        } catch (e: Exception) {
+            println("RecipeRepository: Exception saving draft: ${e.message}")
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+    
+    // Helper function to convert JsonObject patch to UpdateRecipeRequest
+    private fun convertJsonPatchToUpdateRequest(jsonPatch: JsonObject): UpdateRecipeRequest {
+        return UpdateRecipeRequest(
+            title = jsonPatch["title"]?.jsonPrimitive?.content,
+            description = jsonPatch["description"]?.jsonPrimitive?.content,
+            prepTime = jsonPatch["prep_time"]?.jsonPrimitive?.content?.toIntOrNull(),
+            cookTime = jsonPatch["cook_time"]?.jsonPrimitive?.content?.toIntOrNull(),
+            servings = jsonPatch["servings"]?.jsonPrimitive?.content?.toIntOrNull(),
+            difficulty = jsonPatch["difficulty"]?.jsonPrimitive?.content?.toIntOrNull(),
+            ingredients = jsonPatch["ingredients"]?.jsonArray?.map { ingredientJson ->
+                val ingredientObj = ingredientJson.jsonObject
+                Ingredient(
+                    name = ingredientObj["name"]?.jsonPrimitive?.content ?: "",
+                    quantity = ingredientObj["quantity"]?.jsonPrimitive?.content ?: ""
+                )
+            },
+            instructions = jsonPatch["instructions"]?.jsonArray?.map { instructionJson ->
+                instructionJson.jsonPrimitive.content
+            },
+            tags = jsonPatch["tags"]?.jsonArray?.map { tagJson ->
+                tagJson.jsonPrimitive.content
+            },
+            sourcePlatform = jsonPatch["source_platform"]?.jsonPrimitive?.content,
+            sourceUrl = jsonPatch["source_url"]?.jsonPrimitive?.content,
+            videoThumbnail = jsonPatch["video_thumbnail"]?.jsonPrimitive?.content,
+            tiktokAuthor = jsonPatch["tiktok_author"]?.jsonPrimitive?.content,
+            isPublic = jsonPatch["is_public"]?.jsonPrimitive?.content?.toBooleanStrictOrNull()
+        )
     }
     
     // Delete recipe

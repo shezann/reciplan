@@ -27,6 +27,8 @@ import com.example.reciplan.ui.recipe.RecipeScreenDevelopment
 import com.example.reciplan.ui.recipe.RecipeScreenDebug
 import com.example.reciplan.ui.main.MainScreen
 import com.example.reciplan.ui.splash.SplashScreen
+import com.example.reciplan.ui.draft.DraftPreviewScreen
+import com.example.reciplan.ui.draft.DraftPreviewViewModel
 import com.example.reciplan.ui.ingest.AddFromTikTokScreen
 import com.example.reciplan.ui.ingest.IngestStatusScreen
 import com.example.reciplan.ui.theme.ReciplanTheme
@@ -111,6 +113,9 @@ class ViewModelFactory(private val appContainer: com.example.reciplan.di.AppCont
             }
             AddFromTikTokViewModel::class.java -> {
                 AddFromTikTokViewModel.getSharedInstance(appContainer.ingestRepository) as T
+            }
+            DraftPreviewViewModel::class.java -> {
+                appContainer.createDraftPreviewViewModel() as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: $modelClass")
         }
@@ -223,7 +228,7 @@ fun ReciplanApp() {
                     navController.popBackStack()
                 },
                 onNavigateToDraftPreview = { recipeId ->
-                    navController.navigate("recipe_detail/$recipeId") {
+                    navController.navigate("draftPreview/$recipeId") {
                         popUpTo("add_from_tiktok") { inclusive = true }
                     }
                 },
@@ -238,6 +243,25 @@ fun ReciplanApp() {
                 },
                 onRecipeCreated = {
                     navController.popBackStack()
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+        composable(
+            route = "draftPreview/{recipeId}",
+            arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val recipeId = backStackEntry.arguments?.getString("recipeId") ?: ""
+            DraftPreviewScreen(
+                recipeId = recipeId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToRecipeDetail = { finalRecipeId ->
+                    navController.navigate("recipe_detail/$finalRecipeId") {
+                        popUpTo("draftPreview/$recipeId") { inclusive = true }
+                    }
                 },
                 viewModelFactory = viewModelFactory
             )

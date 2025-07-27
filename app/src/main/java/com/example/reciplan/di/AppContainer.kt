@@ -88,4 +88,8 @@ class AppContainer(
     fun createAddFromTikTokViewModel(): AddFromTikTokViewModel {
         return AddFromTikTokViewModel.getSharedInstance(ingestRepository)
     }
+    
+    fun createDraftPreviewViewModel(): com.example.reciplan.ui.draft.DraftPreviewViewModel {
+        return com.example.reciplan.ui.draft.DraftPreviewViewModel(ingestRepository, recipeRepository)
+    }
 } 
