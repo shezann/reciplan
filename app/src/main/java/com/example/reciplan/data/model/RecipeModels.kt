@@ -1,5 +1,7 @@
 package com.example.reciplan.data.model
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 
@@ -27,11 +29,12 @@ data class Recipe(
     @SerialName("updated_at") val updatedAt: String
 )
 
+@Parcelize
 @Serializable
 data class Ingredient(
     val name: String,
     val quantity: String
-)
+) : Parcelable
 
 @Serializable
 data class Nutrition(

@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    onNavigateToAddFromTikTok: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -60,6 +61,23 @@ fun HomeScreen(
             )
             
             Spacer(modifier = Modifier.height(32.dp))
+            
+            // Add from TikTok button
+            Button(
+                onClick = onNavigateToAddFromTikTok,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(
+                    text = "Add Recipe from TikTok",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
             
             Card(
                 modifier = Modifier.fillMaxWidth(),

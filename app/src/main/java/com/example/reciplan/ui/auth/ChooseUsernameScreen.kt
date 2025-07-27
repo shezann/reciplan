@@ -64,7 +64,7 @@ fun ChooseUsernameScreen(
 
     // Handle username set success
     LaunchedEffect(usernameState) {
-        if (usernameState is UsernameState.Set) {
+        if (usernameState is UsernameState.Available) {
             onUsernameSet()
         }
     }
@@ -137,7 +137,7 @@ fun ChooseUsernameScreen(
             OutlinedButton(
                 onClick = { 
                     println("ChooseUsernameScreen: Debug - Clearing authentication state")
-                    viewModel.clearAuthenticationState()
+                    viewModel.signOut()
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -230,7 +230,7 @@ fun ChooseUsernameScreen(
                             when (usernameState) {
                                 is UsernameState.Checking -> Text("Checking availability...")
                                 is UsernameState.Available -> Text("Username is available!", color = Color.Green)
-                                is UsernameState.Unavailable -> Text("Username is taken", color = Color.Red)
+                                is UsernameState.Taken -> Text("Username is taken", color = Color.Red)
                                 is UsernameState.Error -> Text("Error checking availability", color = Color.Red)
                                 else -> Text("")
                             }
@@ -254,7 +254,7 @@ fun ChooseUsernameScreen(
                                     tint = Color.Green
                                 )
                             }
-                            is UsernameState.Unavailable -> {
+                            is UsernameState.Taken -> {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Unavailable",
@@ -265,7 +265,7 @@ fun ChooseUsernameScreen(
                         }
                     }
                 },
-                isError = showValidation && usernameState is UsernameState.Unavailable
+                isError = showValidation && usernameState is UsernameState.Taken
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -278,10 +278,10 @@ fun ChooseUsernameScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = username.length >= 3 && 
                          usernameState is UsernameState.Available && 
-                         usernameState !is UsernameState.Setting
+                         usernameState !is UsernameState.Checking
             ) {
                 when (usernameState) {
-                    is UsernameState.Setting -> {
+                    is UsernameState.Checking -> {
                         Row(
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
@@ -431,7 +431,7 @@ fun ChooseUsernameScreen(
             OutlinedButton(
                 onClick = { 
                     println("ChooseUsernameScreen: Debug - Clearing authentication state")
-                    viewModel.clearAuthenticationState()
+                    viewModel.signOut()
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {

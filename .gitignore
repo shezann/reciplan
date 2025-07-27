@@ -21,3 +21,8 @@ local.properties
 # Keystore files
 *.jks
 *.keystore
+
+
+.cursor
+.taskmaster
+.fake

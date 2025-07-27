@@ -2,11 +2,14 @@ package com.example.reciplan.di
 
 import android.content.Context
 import com.example.reciplan.data.api.AuthApi
+import com.example.reciplan.data.api.IngestApi
 import com.example.reciplan.data.api.RecipeApi
 import com.example.reciplan.data.auth.AuthRepository
 import com.example.reciplan.data.auth.TokenManager
 import com.example.reciplan.data.network.AuthInterceptor
 import com.example.reciplan.data.recipe.RecipeRepository
+import com.example.reciplan.data.repository.IngestRepository
+import com.example.reciplan.ui.ingest.AddFromTikTokViewModel
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -19,7 +22,10 @@ import com.example.reciplan.BuildConfig
  * Simple manual dependency injection container
  * This replaces Hilt temporarily to get the app running
  */
-class AppContainer(private val context: Context) {
+class AppContainer(
+    private val context: Context,
+    private val tokenManager: TokenManager
+) {
     
     // Lazy initialization for dependencies
     private val json by lazy {
@@ -27,10 +33,6 @@ class AppContainer(private val context: Context) {
             ignoreUnknownKeys = true
             coerceInputValues = true
         }
-    }
-    
-    val tokenManager: TokenManager by lazy {
-        TokenManager(context)
     }
     
     private val authInterceptor: AuthInterceptor by lazy {
@@ -72,5 +74,22 @@ class AppContainer(private val context: Context) {
     
     val recipeRepository: RecipeRepository by lazy {
         RecipeRepository(recipeApi)
+    }
+    
+    val ingestApi: IngestApi by lazy {
+        retrofit.create(IngestApi::class.java)
+    }
+    
+    val ingestRepository: IngestRepository by lazy {
+        IngestRepository(ingestApi)
+    }
+    
+    // ViewModels
+    fun createAddFromTikTokViewModel(): AddFromTikTokViewModel {
+        return AddFromTikTokViewModel.getSharedInstance(ingestRepository)
+    }
+    
+    fun createDraftPreviewViewModel(): com.example.reciplan.ui.draft.DraftPreviewViewModel {
+        return com.example.reciplan.ui.draft.DraftPreviewViewModel(ingestRepository, recipeRepository)
     }
 } 

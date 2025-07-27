@@ -3,10 +3,9 @@ package com.example.reciplan.data.auth
 import android.content.Context
 import com.example.reciplan.data.api.AuthApi
 import com.example.reciplan.data.model.*
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.auth.api.identity.SignInClient
+import com.google.android.gms.auth.api.identity.SignInCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -34,31 +33,22 @@ class AuthRepository(
 ) {
     
     private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
-    private val googleSignInClient: GoogleSignInClient
-
-    init {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken("771971890295-5gbmmottvhno7sg422jplfeatn6usnsf.apps.googleusercontent.com")
-            .requestEmail()
-            .build()
-        
-        googleSignInClient = GoogleSignIn.getClient(context, gso)
-    }
+    private val signInClient: SignInClient = Identity.getSignInClient(context)
 
     fun getCurrentUser(): FirebaseUser? = firebaseAuth.currentUser
 
-    fun getGoogleSignInClient(): GoogleSignInClient = googleSignInClient
+    fun getSignInClient(): SignInClient = signInClient
 
-    suspend fun signInWithGoogle(account: GoogleSignInAccount): Flow<AuthResult> = flow {
+    suspend fun signInWithGoogle(credential: SignInCredential): Flow<AuthResult> = flow {
         emit(AuthResult.Loading)
         
         try {
             // First, authenticate with Firebase using Google credentials
-            val googleToken = account.idToken
+            val googleToken = credential.googleIdToken
             if (googleToken != null) {
                 // Sign into Firebase with Google credentials
-                val credential = GoogleAuthProvider.getCredential(googleToken, null)
-                val firebaseResult = firebaseAuth.signInWithCredential(credential).await()
+                val firebaseCredential = GoogleAuthProvider.getCredential(googleToken, null)
+                val firebaseResult = firebaseAuth.signInWithCredential(firebaseCredential).await()
                 val firebaseUser = firebaseResult.user
                 
                 if (firebaseUser != null) {
@@ -108,86 +98,125 @@ class AuthRepository(
         emit(AuthResult.Loading)
         
         try {
+            // Sign in with Firebase using email link
             val result = firebaseAuth.signInWithEmailLink(email, emailLink).await()
             val firebaseUser = result.user
             
             if (firebaseUser != null) {
-                val idToken = firebaseUser.getIdToken(false).await().token
-                if (idToken != null) {
-                    val backendResult = authenticateWithFirebase(idToken)
+                // Get the ID token for backend authentication
+                val idToken = firebaseUser.getIdToken(false).await()
+                val token = idToken.token
+                
+                if (token != null) {
+                    // Authenticate with backend using Firebase token
+                    val backendResult = authenticateWithFirebaseToken(token)
                     emit(backendResult)
                 } else {
-                    emit(AuthResult.Error("Failed to get Firebase ID token"))
+                    emit(AuthResult.Error("Failed to get Firebase token"))
                 }
             } else {
-                emit(AuthResult.Error("Email link authentication failed"))
+                emit(AuthResult.Error("Failed to sign in with email link"))
             }
         } catch (e: Exception) {
             emit(AuthResult.Error("Email link sign-in failed: ${e.message}"))
         }
     }
 
-    private suspend fun authenticateWithFirebase(idToken: String): AuthResult {
-        return try {
-            val response = authApi.firebaseLogin(FirebaseLoginRequest(idToken))
-            if (response.isSuccessful) {
-                val authResponse = response.body()
-                if (authResponse != null) {
-                    tokenManager.saveTokens(authResponse.access_token, "") // No refresh token in this API
-                    
-                    // Use the user data from the auth response and consider setup_required flag
-                    val user = authResponse.user.copy(
-                        setup_complete = !authResponse.setup_required // If setup not required, then it's complete
-                    )
-                    AuthResult.Success(user)
-                } else {
-                    AuthResult.Error("Invalid response from server")
-                }
-            } else {
-                AuthResult.Error("Authentication failed: ${response.message()}")
-            }
-        } catch (e: Exception) {
-            AuthResult.Error("Network error: ${e.message}")
-        }
-    }
-
     private suspend fun authenticateWithGoogle(googleToken: String): AuthResult {
         return try {
-            println("AuthRepository: Sending Google token to backend...")
             val response = authApi.googleLogin(GoogleLoginRequest(googleToken))
-            println("AuthRepository: Backend response code: ${response.code()}")
             
             if (response.isSuccessful) {
                 val authResponse = response.body()
-                println("AuthRepository: Backend response body: $authResponse")
-                
                 if (authResponse != null) {
-                    println("AuthRepository: Saving access token: ${authResponse.access_token?.take(20)}...")
-                    tokenManager.saveTokens(authResponse.access_token, "") // No refresh token in this API
+                    // Store tokens
+                    tokenManager.saveAccessToken(authResponse.access_token)
                     
-                    // Use the user data from the auth response and consider setup_required flag
-                    val user = authResponse.user.copy(
-                        setup_complete = !authResponse.setup_required // If setup not required, then it's complete
-                    )
-                    println("AuthRepository: User authenticated successfully: ${user.id}")
-                    AuthResult.Success(user)
+                    AuthResult.Success(authResponse.user)
                 } else {
-                    println("AuthRepository: Null response body from backend")
-                    AuthResult.Error("Invalid response from server")
+                    AuthResult.Error("Empty response from server")
                 }
             } else {
-                val errorBody = response.errorBody()?.string()
-                println("AuthRepository: Backend error: ${response.code()} - $errorBody")
-                AuthResult.Error("Authentication failed: ${response.message()}")
+                AuthResult.Error("Authentication failed: ${response.code()}")
             }
         } catch (e: Exception) {
-            println("AuthRepository: Exception during Google auth: ${e.message}")
-            e.printStackTrace()
             AuthResult.Error("Network error: ${e.message}")
         }
     }
 
-    suspend fun checkUsernameAvailability(username: String): Result<Boolean> {
+    private suspend fun authenticateWithFirebaseToken(firebaseToken: String): AuthResult {
+        return try {
+            val response = authApi.firebaseLogin(FirebaseLoginRequest(firebaseToken))
+            
+            if (response.isSuccessful) {
+                val authResponse = response.body()
+                if (authResponse != null) {
+                    // Store tokens
+                    tokenManager.saveAccessToken(authResponse.access_token)
+                    
+                    AuthResult.Success(authResponse.user)
+                } else {
+                    AuthResult.Error("Empty response from server")
+                }
+            } else {
+                AuthResult.Error("Authentication failed: ${response.code()}")
+            }
+        } catch (e: Exception) {
+            AuthResult.Error("Network error: ${e.message}")
+        }
+    }
+
+    suspend fun signOut() {
+        try {
+            // Sign out from Firebase
+            firebaseAuth.signOut()
+            
+            // Sign out from Google Identity Services
+            signInClient.signOut()
+            
+            // Clear stored tokens
+            tokenManager.clearTokens()
+            
+            println("AuthRepository: Sign out completed")
+        } catch (e: Exception) {
+            println("AuthRepository: Error during sign out: ${e.message}")
+        }
+    }
+
+    suspend fun getAuthState(): Flow<AuthState> = flow {
+        val currentUser = firebaseAuth.currentUser
+        val hasValidTokens = tokenManager.hasValidAccessToken()
+        
+        when {
+            currentUser != null && hasValidTokens -> {
+                println("AuthRepository: User is authenticated with valid tokens")
+                emit(AuthState.Authenticated)
+            }
+            currentUser != null && !hasValidTokens -> {
+                println("AuthRepository: Firebase user exists but no valid tokens")
+                emit(AuthState.Loading)
+                // User is signed into Firebase but doesn't have valid backend tokens
+                // Try to authenticate with Google token
+                try {
+                    // For GIS, we need to handle this differently since we don't have a persistent Google account
+                    // We'll need to re-authenticate through the UI flow
+                    println("AuthRepository: No persistent Google account available, signing out")
+                    signOut()
+                    emit(AuthState.Unauthenticated)
+                } catch (e: Exception) {
+                    println("AuthRepository: Authentication attempt failed: ${e.message}")
+                    signOut()
+                    emit(AuthState.Unauthenticated)
+                }
+            }
+            else -> {
+                println("AuthRepository: No Firebase user or tokens, user is unauthenticated")
+                emit(AuthState.Unauthenticated)
+            }
+        }
+    }
+
+    suspend fun checkUsernameAvailability(username: String): Boolean {
         return try {
             println("AuthRepository: Checking username availability for: $username")
             val response = authApi.checkUsernameAvailability(CheckUsernameRequest(username))
@@ -196,7 +225,7 @@ class AuthRepository(
             if (response.isSuccessful) {
                 val availability = response.body()
                 println("AuthRepository: Username availability response: $availability")
-                Result.success(availability?.available ?: false)
+                availability?.available ?: false
             } else {
                 val errorBody = response.errorBody()?.string()
                 println("AuthRepository: Username check error: ${response.code()} - $errorBody")
@@ -207,12 +236,12 @@ class AuthRepository(
                     500 -> "Server error occurred"
                     else -> "Failed to check username availability: ${response.message()}"
                 }
-                Result.failure(Exception(errorMessage))
+                throw Exception(errorMessage)
             }
         } catch (e: Exception) {
             println("AuthRepository: Exception during username check: ${e.message}")
             e.printStackTrace()
-            Result.failure(e)
+            throw e
         }
     }
 
@@ -220,7 +249,7 @@ class AuthRepository(
         username: String,
         dietaryRestrictions: List<String> = emptyList(),
         preferences: Map<String, String> = emptyMap()
-    ): Result<User> {
+    ): User {
         return try {
             println("AuthRepository: Setting up user with username: $username")
             val response = authApi.setupUser(
@@ -236,9 +265,9 @@ class AuthRepository(
                 val user = response.body()
                 println("AuthRepository: Setup user successful: $user")
                 if (user != null) {
-                    Result.success(user)
+                    user
                 } else {
-                    Result.failure(Exception("Invalid response"))
+                    throw Exception("Invalid response")
                 }
             } else {
                 val errorBody = response.errorBody()?.string()
@@ -252,96 +281,12 @@ class AuthRepository(
                     500 -> "Server error occurred"
                     else -> "Failed to setup user: ${response.message()}"
                 }
-                Result.failure(Exception(errorMessage))
+                throw Exception(errorMessage)
             }
         } catch (e: Exception) {
             println("AuthRepository: Exception during user setup: ${e.message}")
             e.printStackTrace()
-            Result.failure(e)
-        }
-    }
-
-    suspend fun signOut() {
-        try {
-            firebaseAuth.signOut()
-            googleSignInClient.signOut().await()
-            tokenManager.clearTokens()
-        } catch (e: Exception) {
-            // Handle error
-        }
-    }
-
-    fun getAuthState(): Flow<AuthState> = flow {
-        val currentUser = firebaseAuth.currentUser
-        val hasValidTokens = tokenManager.hasValidTokens()
-        
-        println("AuthRepository: getAuthState() - Firebase user: ${currentUser?.email}, hasValidTokens: $hasValidTokens")
-        
-        when {
-            currentUser != null && hasValidTokens -> {
-                emit(AuthState.Loading)
-                try {
-                    // Validate tokens with backend by trying to get current user data
-                    val response = authApi.getCurrentUser()
-                    println("AuthRepository: Backend user data response code: ${response.code()}")
-                    
-                    if (response.isSuccessful) {
-                        val userResponse = response.body()
-                        val user = userResponse?.user
-                        if (user != null) {
-                            println("AuthRepository: Backend authentication valid - user: ${user.email}")
-                            emit(AuthState.Authenticated)
-                        } else {
-                            println("AuthRepository: Backend returned null user, signing out")
-                            signOut()
-                            emit(AuthState.Unauthenticated)
-                        }
-                    } else {
-                        println("AuthRepository: Backend authentication failed with code: ${response.code()}")
-                        // Backend authentication failed - clear tokens and sign out
-                        signOut()
-                        emit(AuthState.Unauthenticated)
-                    }
-                } catch (e: Exception) {
-                    println("AuthRepository: Network error during auth validation: ${e.message}")
-                    // Network error - clear tokens and sign out to force fresh authentication
-                    signOut()
-                    emit(AuthState.Unauthenticated)
-                }
-            }
-            currentUser != null && !hasValidTokens -> {
-                println("AuthRepository: Firebase user exists but no valid tokens")
-                emit(AuthState.Loading)
-                // User is signed into Firebase but doesn't have valid backend tokens
-                // Try to authenticate with Google token
-                try {
-                    val googleAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
-                    if (googleAccount != null && googleAccount.idToken != null) {
-                        println("AuthRepository: Attempting authentication with Google token")
-                        val authResult = authenticateWithGoogle(googleAccount.idToken!!)
-                        if (authResult is AuthResult.Success) {
-                            println("AuthRepository: Authentication successful")
-                            emit(AuthState.Authenticated)
-                        } else {
-                            println("AuthRepository: Authentication failed, signing out")
-                            signOut()
-                            emit(AuthState.Unauthenticated)
-                        }
-                    } else {
-                        println("AuthRepository: No Google account available, signing out")
-                        signOut()
-                        emit(AuthState.Unauthenticated)
-                    }
-                } catch (e: Exception) {
-                    println("AuthRepository: Authentication attempt failed: ${e.message}")
-                    signOut()
-                    emit(AuthState.Unauthenticated)
-                }
-            }
-            else -> {
-                println("AuthRepository: No Firebase user or tokens, user is unauthenticated")
-                emit(AuthState.Unauthenticated)
-            }
+            throw e
         }
     }
 
@@ -357,47 +302,14 @@ class AuthRepository(
                 println("AuthRepository: getCurrentUserData() - user: ${user?.email}")
                 user
             } else {
-                println("AuthRepository: getCurrentUserData() - failed, attempting re-authentication")
-                // Backend call failed, try to re-authenticate with Google token
-                val googleAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
-                if (googleAccount != null && googleAccount.idToken != null) {
-                    println("AuthRepository: Re-authenticating with Google token")
-                    val authResult = authenticateWithGoogle(googleAccount.idToken!!)
-                    if (authResult is AuthResult.Success) {
-                        println("AuthRepository: Re-authentication successful, returning user")
-                        authResult.user
-                    } else {
-                        println("AuthRepository: Re-authentication failed")
-                        null
-                    }
-                } else {
-                    println("AuthRepository: No Google account available for re-authentication")
-                    null
-                }
+                println("AuthRepository: getCurrentUserData() - failed, user needs to re-authenticate")
+                // Backend call failed, user needs to re-authenticate through the UI
+                null
             }
         } catch (e: Exception) {
             println("AuthRepository: getCurrentUserData() - exception: ${e.message}")
-            // Network error - try to re-authenticate with Google token
-            try {
-                val googleAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
-                if (googleAccount != null && googleAccount.idToken != null) {
-                    println("AuthRepository: Re-authenticating with Google token after network error")
-                    val authResult = authenticateWithGoogle(googleAccount.idToken!!)
-                    if (authResult is AuthResult.Success) {
-                        println("AuthRepository: Re-authentication successful after network error")
-                        authResult.user
-                    } else {
-                        println("AuthRepository: Re-authentication failed after network error")
-                        null
-                    }
-                } else {
-                    println("AuthRepository: No Google account available for re-authentication after network error")
-                    null
-                }
-            } catch (reAuthException: Exception) {
-                println("AuthRepository: Re-authentication failed with exception: ${reAuthException.message}")
-                null
-            }
+            // Network error - user needs to re-authenticate through the UI
+            null
         }
     }
 } 
