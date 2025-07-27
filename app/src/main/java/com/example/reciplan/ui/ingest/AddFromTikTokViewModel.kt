@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import com.example.reciplan.data.model.IngestErrorCode
 import com.example.reciplan.ui.common.ErrorMapper
+import com.example.reciplan.analytics.Telemetry
 
 data class AddFromTikTokUiState(
     val isLoading: Boolean = false,
@@ -81,6 +82,9 @@ class AddFromTikTokViewModel(
     fun startIngest(url: String) {
         if (_uiState.value.isLoading) return
         
+        // Fire telemetry event for ingest started
+        Telemetry.ingestStarted(url)
+        
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isLoading = true,
@@ -118,9 +122,26 @@ class AddFromTikTokViewModel(
             jobDetails = jobDetails
         )
         
-        // Handle error states
-        if (jobDetails.status == IngestStatus.FAILED && jobDetails.errorCode != null) {
-            handleIngestError(jobDetails.errorCode)
+        // Fire telemetry events for terminal states
+        when (jobDetails.status) {
+            IngestStatus.COMPLETED -> {
+                Telemetry.ingestSucceeded(
+                    jobId = jobDetails.jobId ?: "unknown",
+                    recipeId = jobDetails.recipeId
+                )
+            }
+            IngestStatus.FAILED -> {
+                if (jobDetails.errorCode != null) {
+                    Telemetry.ingestFailed(
+                        errorCode = jobDetails.errorCode,
+                        jobId = jobDetails.jobId
+                    )
+                    handleIngestError(jobDetails.errorCode)
+                }
+            }
+            else -> {
+                // Non-terminal status, continue polling
+            }
         }
         
         // Stop polling if job is complete
@@ -155,6 +176,9 @@ class AddFromTikTokViewModel(
         val currentErrorCode = _uiState.value.errorCode
         
         if (currentJobId != null && currentErrorCode != null && ErrorMapper.isRecoverable(currentErrorCode)) {
+            // Fire telemetry event for retry
+            Telemetry.ingestRetried(currentErrorCode, currentJobId)
+            
             viewModelScope.launch {
                 _uiState.value = _uiState.value.copy(
                     isLoading = true,
@@ -255,7 +279,7 @@ class AddFromTikTokViewModel(
         }
     }
     
-    /**
+        /**
      * Stop polling
      */
     private fun stopPolling() {
@@ -264,6 +288,22 @@ class AddFromTikTokViewModel(
         _uiState.value = _uiState.value.copy(isPolling = false)
     }
     
+    /**
+     * Cancel current ingest job (for when user navigates away)
+     */
+    fun cancelIngest() {
+        val currentJobId = _uiState.value.jobId
+        val currentStatus = _uiState.value.jobStatus
+        
+        // Only fire cancellation event if job is still in progress
+        if (currentJobId != null && currentStatus != null && 
+            currentStatus != IngestStatus.COMPLETED && currentStatus != IngestStatus.FAILED) {
+            Telemetry.ingestCancelled(currentJobId)
+        }
+        
+        stopPolling()
+    }
+
     override fun onCleared() {
         super.onCleared()
         stopPolling()
