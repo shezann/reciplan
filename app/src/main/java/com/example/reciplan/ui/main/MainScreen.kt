@@ -97,9 +97,7 @@ fun MainScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) {
-                HomeScreen(
-                    onNavigateToAddFromTikTok = onNavigateToAddFromTikTok
-                )
+                HomeScreen()
             }
             
             composable(BottomNavItem.Recipes.route) {
@@ -107,6 +105,7 @@ fun MainScreen(
                     onNavigateToCreateRecipe = onNavigateToCreateRecipe,
                     onNavigateToRecipeDetail = onNavigateToRecipeDetail,
                     onNavigateToEditRecipe = onNavigateToEditRecipe,
+                    onNavigateToAddFromTikTok = onNavigateToAddFromTikTok,
                     viewModelFactory = viewModelFactory,
                     showCreateButton = true // Show the plus button only in recipes tab
                 )

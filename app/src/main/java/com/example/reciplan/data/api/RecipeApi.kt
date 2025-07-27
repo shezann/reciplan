@@ -50,6 +50,22 @@ interface RecipeApi {
         @Query("limit") limit: Int = 10
     ): Response<SavedRecipesResponse>
     
+    // Like operations
+    @POST("api/recipes/{id}/like")
+    suspend fun likeRecipe(
+        @Path("id") recipeId: String
+    ): Response<LikeResponse>
+    
+    @DELETE("api/recipes/{id}/like")
+    suspend fun unlikeRecipe(
+        @Path("id") recipeId: String
+    ): Response<LikeResponse>
+    
+    @GET("api/recipes/{id}/liked")
+    suspend fun getLikedStatus(
+        @Path("id") recipeId: String
+    ): Response<LikedStatusResponse>
+    
     // Development/Testing endpoint
     @POST("api/recipes/seed")
     suspend fun seedRecipes(): Response<Unit>

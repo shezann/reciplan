@@ -104,6 +104,29 @@ data class DeleteRecipeResponse(
     @SerialName("recipe_id") val recipeId: String
 )
 
+// Like-related DTOs
+@Serializable
+data class LikeResponse(
+    val success: Boolean,
+    val liked: Boolean,
+    @SerialName("likes_count") val likesCount: Int,
+    @SerialName("recipe_id") val recipeId: String
+)
+
+@Serializable
+data class LikedStatusResponse(
+    val liked: Boolean,
+    @SerialName("likes_count") val likesCount: Int,
+    @SerialName("recipe_id") val recipeId: String
+)
+
+@Serializable
+data class LikeErrorResponse(
+    val error: String,
+    val code: String? = null,
+    @SerialName("retry_after_seconds") val retryAfterSeconds: Int? = null
+)
+
 @Serializable
 data class SaveRecipeResponse(
     val message: String,

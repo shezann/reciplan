@@ -31,6 +31,7 @@ fun RecipeScreen(
     onNavigateToCreateRecipe: () -> Unit,
     onNavigateToRecipeDetail: (String) -> Unit,
     onNavigateToEditRecipe: (String) -> Unit,
+    onNavigateToAddFromTikTok: () -> Unit = {},
     viewModelFactory: ViewModelProvider.Factory,
     showCreateButton: Boolean = true,
     modifier: Modifier = Modifier
@@ -46,6 +47,7 @@ fun RecipeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var recipeToDelete by remember { mutableStateOf<Recipe?>(null) }
+    var showCreateMenuDropdown by remember { mutableStateOf(false) }
     
     // Get current user ID from auth state
     val currentUserId = when (val state = authState) {
@@ -108,16 +110,38 @@ fun RecipeScreen(
                     )
                     
                     if (showCreateButton) {
-                        FloatingActionButton(
-                            onClick = onNavigateToCreateRecipe,
-                            modifier = Modifier.size(48.dp),
-                            containerColor = MaterialTheme.colorScheme.primary
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Add Recipe",
-                                tint = MaterialTheme.colorScheme.onPrimary
-                            )
+                        Box {
+                            FloatingActionButton(
+                                onClick = { showCreateMenuDropdown = true },
+                                modifier = Modifier.size(48.dp),
+                                containerColor = MaterialTheme.colorScheme.primary
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Add Recipe",
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                            
+                            DropdownMenu(
+                                expanded = showCreateMenuDropdown,
+                                onDismissRequest = { showCreateMenuDropdown = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Create Recipe") },
+                                    onClick = {
+                                        showCreateMenuDropdown = false
+                                        onNavigateToCreateRecipe()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Add from TikTok") },
+                                    onClick = {
+                                        showCreateMenuDropdown = false
+                                        onNavigateToAddFromTikTok()
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -324,6 +348,7 @@ fun RecipeScreenDevelopment(
     onNavigateToCreateRecipe: () -> Unit,
     onNavigateToRecipeDetail: (String) -> Unit,
     onNavigateToEditRecipe: (String) -> Unit,
+    onNavigateToAddFromTikTok: () -> Unit = {},
     viewModelFactory: ViewModelProvider.Factory,
     showCreateButton: Boolean = true,
     modifier: Modifier = Modifier
@@ -362,6 +387,7 @@ fun RecipeScreenDevelopment(
             onNavigateToCreateRecipe = onNavigateToCreateRecipe,
             onNavigateToRecipeDetail = onNavigateToRecipeDetail,
             onNavigateToEditRecipe = onNavigateToEditRecipe,
+            onNavigateToAddFromTikTok = onNavigateToAddFromTikTok,
             viewModelFactory = viewModelFactory,
             showCreateButton = showCreateButton,
             modifier = Modifier.weight(1f)

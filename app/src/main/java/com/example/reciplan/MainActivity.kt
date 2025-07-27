@@ -95,6 +95,12 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    
+    override fun onPause() {
+        super.onPause()
+        // Clear shared instance when app is paused to prevent stale state issues
+        AddFromTikTokViewModel.clearSharedInstance()
+    }
 }
 
 // Custom ViewModelFactory for manual DI

@@ -17,6 +17,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
+import com.example.reciplan.ui.ingest.AddFromTikTokViewModel
 
 // Navigation events for the draft preview screen
 sealed class DraftPreviewNavigationEvent {
@@ -49,6 +50,7 @@ data class DraftPreviewUiState(
     val onscreenText: String? = null,
     val ingredientCandidates: List<String> = emptyList(),
     val hasUnsavedChanges: Boolean = false,
+    val lastSaveType: String? = null, // "approve" or "save" - tracks the type of last save operation
     // Original data for patch generation
     val originalTitle: String = "",
     val originalDescription: String = "",
@@ -93,6 +95,23 @@ class DraftPreviewViewModel(
      * Falls back to ingest job data (for drafts still in progress)
      */
     fun loadRecipeData(recipeId: String) {
+        loadRecipeDataInternal(recipeId, respectUnsavedChanges = true)
+    }
+    
+    /**
+     * Force reload recipe data, ignoring unsaved changes
+     * Used for retry operations where user explicitly wants to reload
+     */
+    fun forceLoadRecipeData(recipeId: String) {
+        loadRecipeDataInternal(recipeId, respectUnsavedChanges = false)
+    }
+    
+    private fun loadRecipeDataInternal(recipeId: String, respectUnsavedChanges: Boolean) {
+        // Don't reload if there are unsaved changes to prevent overwriting user edits
+        if (respectUnsavedChanges && _uiState.value.hasUnsavedChanges) {
+            return
+        }
+        
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isLoading = true,
@@ -537,6 +556,123 @@ class DraftPreviewViewModel(
     }
     
     /**
+     * Start editing a specific instruction
+     */
+    fun startEditingInstruction(instructionId: String) {
+        val currentInstructions = _uiState.value.instructions
+        val updatedInstructions = currentInstructions.map { instruction ->
+            if (instruction.id == instructionId) {
+                instruction.copy(isEditing = true)
+            } else {
+                instruction.copy(isEditing = false) // Only one instruction can be edited at a time
+            }
+        }
+        
+        _uiState.value = _uiState.value.copy(
+            instructions = updatedInstructions
+        )
+    }
+    
+    /**
+     * Update a specific instruction's text
+     */
+    fun updateInstructionText(instructionId: String, newText: String) {
+        val currentInstructions = _uiState.value.instructions
+        val updatedInstructions = currentInstructions.map { instruction ->
+            if (instruction.id == instructionId) {
+                instruction.copy(text = newText)
+            } else {
+                instruction
+            }
+        }
+        
+        _uiState.value = _uiState.value.copy(
+            instructions = updatedInstructions,
+            hasUnsavedChanges = true
+        )
+    }
+    
+    /**
+     * Stop editing instructions
+     */
+    fun stopEditingInstructions() {
+        val currentInstructions = _uiState.value.instructions
+        val updatedInstructions = currentInstructions.map { instruction ->
+            instruction.copy(isEditing = false)
+        }
+        
+        _uiState.value = _uiState.value.copy(
+            instructions = updatedInstructions
+        )
+    }
+    
+    /**
+     * Cancel instruction editing and revert to original text
+     */
+    fun cancelInstructionEditing(instructionId: String, originalText: String) {
+        val currentInstructions = _uiState.value.instructions
+        val updatedInstructions = currentInstructions.map { instruction ->
+            if (instruction.id == instructionId) {
+                instruction.copy(
+                    isEditing = false,
+                    text = originalText
+                )
+            } else {
+                instruction
+            }
+        }
+        
+        _uiState.value = _uiState.value.copy(
+            instructions = updatedInstructions
+        )
+    }
+    
+    /**
+     * Add a new instruction
+     */
+    fun addNewInstruction() {
+        val currentInstructions = _uiState.value.instructions
+        val newId = "inst_new_${System.currentTimeMillis()}"
+        val newStepNumber = currentInstructions.size + 1
+        val newInstruction = EditableInstruction(
+            id = newId,
+            text = "",
+            stepNumber = newStepNumber,
+            isEditing = true
+        )
+        
+        // Stop editing other instructions
+        val updatedExistingInstructions = currentInstructions.map { instruction ->
+            instruction.copy(isEditing = false)
+        }
+        
+        _uiState.value = _uiState.value.copy(
+            instructions = updatedExistingInstructions + newInstruction,
+            hasUnsavedChanges = true
+        )
+    }
+    
+    /**
+     * Delete an instruction
+     */
+    fun deleteInstruction(instructionId: String) {
+        val currentInstructions = _uiState.value.instructions
+        val updatedInstructions = currentInstructions.filter { instruction ->
+            instruction.id != instructionId
+        }
+        
+        // Update step numbers to maintain sequence
+        val reorderedInstructions = updatedInstructions.mapIndexed { index, instruction ->
+            instruction.copy(stepNumber = index + 1)
+        }
+        
+        _uiState.value = _uiState.value.copy(
+            instructions = reorderedInstructions,
+            hasUnsavedChanges = true
+        )
+    }
+    
+    /**
      * Reorder instructions by moving an instruction from one position to another
      */
     fun reorderInstructions(fromIndex: Int, toIndex: Int) {
@@ -755,9 +891,13 @@ class DraftPreviewViewModel(
      */
     fun saveRecipe(recipeId: String) {
         viewModelScope.launch {
+            // Capture the save type based on current state
+            val saveType = if (_uiState.value.hasUnsavedChanges) "save" else "approve"
+            
             _uiState.value = _uiState.value.copy(
                 isSaving = true,
-                saveError = null
+                saveError = null,
+                lastSaveType = saveType
             )
             
             val result = saveDraftInternal(recipeId)
@@ -773,6 +913,10 @@ class DraftPreviewViewModel(
                     val message = result.getOrNull() ?: "Recipe saved successfully"
                     _navigationEvents.send(DraftPreviewNavigationEvent.ShowSaveSuccess(message))
                     _navigationEvents.send(DraftPreviewNavigationEvent.NavigateToRecipeDetail(recipeId))
+                    
+                    // Clear the shared AddFromTikTok instance after successful save
+                    // This ensures the next TikTok import starts with a clean state
+                    AddFromTikTokViewModel.clearSharedInstance()
                 }
                 result.isFailure -> {
                     val error = result.exceptionOrNull()?.message ?: "Failed to save recipe"
@@ -806,6 +950,13 @@ class DraftPreviewViewModel(
             // No changes to save
             Result.success("No changes to save")
         }
+    }
+    
+    /**
+     * Clear the last save type flag
+     */
+    fun clearLastSaveType() {
+        _uiState.value = _uiState.value.copy(lastSaveType = null)
     }
     
     /**

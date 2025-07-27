@@ -9,6 +9,7 @@ import com.example.reciplan.data.auth.TokenManager
 import com.example.reciplan.data.network.AuthInterceptor
 import com.example.reciplan.data.recipe.RecipeRepository
 import com.example.reciplan.data.repository.IngestRepository
+import com.example.reciplan.data.repository.LikeRepository
 import com.example.reciplan.ui.ingest.AddFromTikTokViewModel
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.serialization.json.Json
@@ -82,6 +83,10 @@ class AppContainer(
     
     val ingestRepository: IngestRepository by lazy {
         IngestRepository(ingestApi)
+    }
+    
+    val likeRepository: LikeRepository by lazy {
+        LikeRepository(recipeApi)
     }
     
     // ViewModels
