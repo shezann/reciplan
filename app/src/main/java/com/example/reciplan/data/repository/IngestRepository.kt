@@ -100,6 +100,55 @@ class IngestRepository(
     }
     
     /**
+     * Get all active jobs for the current user
+     * @return Result containing list of active jobs
+     */
+    suspend fun getActiveJobs(): Result<List<IngestJobDto>> {
+        return try {
+            println("IngestRepository: Getting active jobs")
+            
+            val response = ingestApi.getActiveJobs()
+            
+            println("IngestRepository: Get active jobs response code: ${response.code()}")
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                println("IngestRepository: Get active jobs response body: $body")
+                if (body != null) {
+                    val activeJobs = body.filter { job ->
+                        // Consider jobs as active if they're not in terminal states
+                        job.status !in listOf(
+                            IngestStatus.COMPLETED,
+                            IngestStatus.FAILED
+                        )
+                    }
+                    println("IngestRepository: Found ${activeJobs.size} active jobs")
+                    Result.success(activeJobs)
+                } else {
+                    println("IngestRepository: Empty response body despite successful get active jobs response")
+                    Result.success(emptyList())
+                }
+            } else {
+                val errorBody = response.errorBody()?.string()
+                println("IngestRepository: Get active jobs error response body: $errorBody")
+                Result.failure(handleError(response))
+            }
+        } catch (e: Exception) {
+            println("IngestRepository: Exception getting active jobs: ${e.message}")
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Get the count of active jobs
+     * @return Result containing the number of active jobs
+     */
+    suspend fun getActiveJobCount(): Result<Int> {
+        return getActiveJobs().map { jobs -> jobs.size }
+    }
+    
+    /**
      * Helper function to handle API errors
      */
     private fun handleError(response: Response<*>): Exception {

@@ -2,6 +2,7 @@ package com.example.reciplan
 
 import android.app.Application
 import com.example.reciplan.di.AppContainer
+import com.example.reciplan.data.auth.TokenManager
 
 class ReciplanApplication : Application() {
     
@@ -10,6 +11,7 @@ class ReciplanApplication : Application() {
     
     override fun onCreate() {
         super.onCreate()
-        appContainer = AppContainer(this)
+        val tokenManager = TokenManager(this)
+        appContainer = AppContainer(this, tokenManager)
     }
 } 

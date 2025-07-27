@@ -19,6 +19,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.reciplan.R
 import com.example.reciplan.data.auth.AuthResult
+import com.google.android.gms.auth.api.identity.BeginSignInRequest
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.auth.api.identity.SignInClient
+import com.google.android.gms.common.api.ApiException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,11 +38,19 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var showEmailLinkSent by remember { mutableStateOf(false) }
     
-    // Google Sign-In launcher
+    // Google Sign-In launcher using One Tap
+    val signInClient = remember { Identity.getSignInClient(context) }
+    
     val googleSignInLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
+        contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        viewModel.handleGoogleSignInResult(result.data)
+        try {
+            val credential = signInClient.getSignInCredentialFromIntent(result.data)
+            viewModel.handleGoogleSignInResult(credential)
+        } catch (e: ApiException) {
+            // Handle sign-in failure
+            viewModel.setLoading()
+        }
     }
 
     // Handle auth state changes
@@ -99,29 +111,45 @@ fun LoginScreen(
                     Icon(
                         imageVector = Icons.Default.Email,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
+                    
                     Spacer(modifier = Modifier.height(16.dp))
+                    
                     Text(
-                        text = "Check your email",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "Check your email!",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         textAlign = TextAlign.Center
                     )
+                    
                     Spacer(modifier = Modifier.height(8.dp))
+                    
                     Text(
                         text = "We've sent a sign-in link to $email",
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "Click the link in your email to sign in",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         textAlign = TextAlign.Center
                     )
                 }
             }
         } else {
-            // Login form
+            // Email input form
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("Email") },
+                placeholder = { Text("Enter your email address") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -129,16 +157,13 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Send Email Link Button
             Button(
-                onClick = {
-                    if (email.isNotBlank()) {
-                        viewModel.sendEmailLink(email)
-                        // showEmailLinkSent will be set when we get success response
-                    }
+                onClick = { 
+                    viewModel.setLoading()
+                    viewModel.sendEmailLink(email)
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = email.isNotBlank() && authState !is AuthResult.Loading
+                enabled = email.isNotEmpty() && authState !is AuthResult.Loading
             ) {
                 if (authState is AuthResult.Loading) {
                     CircularProgressIndicator(
@@ -172,10 +197,28 @@ fun LoginScreen(
             OutlinedButton(
                 onClick = { 
                     viewModel.setLoading()
-                    val intent = viewModel.getGoogleSignInIntent()
-                    if (intent != null) {
-                        googleSignInLauncher.launch(intent)
-                    }
+                    // Launch One Tap sign-in
+                    val signInRequest = BeginSignInRequest.builder()
+                        .setGoogleIdTokenRequestOptions(
+                            BeginSignInRequest.GoogleIdTokenRequestOptions.builder()
+                                .setSupported(true)
+                                .setFilterByAuthorizedAccounts(false)
+                                .setServerClientId("771971890295-5gbmmottvhno7sg422jplfeatn6usnsf.apps.googleusercontent.com")
+                                .build()
+                        )
+                        .build()
+                    
+                    signInClient.beginSignIn(signInRequest)
+                        .addOnSuccessListener { result ->
+                            val intentSenderRequest = androidx.activity.result.IntentSenderRequest.Builder(
+                                result.pendingIntent.intentSender
+                            ).build()
+                            googleSignInLauncher.launch(intentSenderRequest)
+                        }
+                        .addOnFailureListener {
+                            // Handle failure
+                            viewModel.setLoading()
+                        }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = authState !is AuthResult.Loading

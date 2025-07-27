@@ -453,4 +453,168 @@ class IngestRepositoryTest {
             assertEquals("Transcript for ${status.getDisplayName()}", job?.transcript)
         }
     }
+    
+    @Test
+    fun `getActiveJobs success - returns active jobs only`() = runTest {
+        // Given
+        val activeJobsResponse = """
+            [
+                {
+                    "job_id": "job_1",
+                    "recipe_id": null,
+                    "status": "QUEUED",
+                    "title": "Video 1",
+                    "transcript": null,
+                    "error_code": null,
+                    "recipe_json": null,
+                    "onscreen_text": null,
+                    "ingredient_candidates": null,
+                    "parse_errors": null,
+                    "llm_error_message": null
+                },
+                {
+                    "job_id": "job_2",
+                    "recipe_id": null,
+                    "status": "DOWNLOADING",
+                    "title": "Video 2",
+                    "transcript": null,
+                    "error_code": null,
+                    "recipe_json": null,
+                    "onscreen_text": null,
+                    "ingredient_candidates": null,
+                    "parse_errors": null,
+                    "llm_error_message": null
+                },
+                {
+                    "job_id": "job_3",
+                    "recipe_id": "recipe_123",
+                    "status": "COMPLETED",
+                    "title": "Video 3",
+                    "transcript": "Recipe transcript",
+                    "error_code": null,
+                    "recipe_json": "{\"title\":\"Recipe\"}",
+                    "onscreen_text": null,
+                    "ingredient_candidates": null,
+                    "parse_errors": null,
+                    "llm_error_message": null
+                },
+                {
+                    "job_id": "job_4",
+                    "recipe_id": null,
+                    "status": "FAILED",
+                    "title": "Video 4",
+                    "transcript": null,
+                    "error_code": "VIDEO_UNAVAILABLE",
+                    "recipe_json": null,
+                    "onscreen_text": null,
+                    "ingredient_candidates": null,
+                    "parse_errors": null,
+                    "llm_error_message": null
+                }
+            ]
+        """.trimIndent()
+        
+        mockWebServer.enqueue(MockResponse()
+            .setResponseCode(200)
+            .setBody(activeJobsResponse)
+            .addHeader("Content-Type", "application/json"))
+        
+        // When
+        val result = ingestRepository.getActiveJobs()
+        
+        // Then
+        assertTrue(result.isSuccess)
+        val activeJobs = result.getOrNull()
+        assertNotNull(activeJobs)
+        assertEquals(2, activeJobs?.size) // Only QUEUED and DOWNLOADING are active
+        assertTrue(activeJobs?.any { it.jobId == "job_1" && it.status == IngestStatus.QUEUED } == true)
+        assertTrue(activeJobs?.any { it.jobId == "job_2" && it.status == IngestStatus.DOWNLOADING } == true)
+        assertFalse(activeJobs?.any { it.jobId == "job_3" } == true) // COMPLETED is not active
+        assertFalse(activeJobs?.any { it.jobId == "job_4" } == true) // FAILED is not active
+    }
+    
+    @Test
+    fun `getActiveJobs success - empty list`() = runTest {
+        // Given
+        val emptyResponse = "[]"
+        
+        mockWebServer.enqueue(MockResponse()
+            .setResponseCode(200)
+            .setBody(emptyResponse)
+            .addHeader("Content-Type", "application/json"))
+        
+        // When
+        val result = ingestRepository.getActiveJobs()
+        
+        // Then
+        assertTrue(result.isSuccess)
+        val activeJobs = result.getOrNull()
+        assertNotNull(activeJobs)
+        assertEquals(0, activeJobs?.size)
+    }
+    
+    @Test
+    fun `getActiveJobs failure - network error`() = runTest {
+        // Given
+        mockWebServer.enqueue(MockResponse()
+            .setResponseCode(500)
+            .setBody("Internal Server Error"))
+        
+        // When
+        val result = ingestRepository.getActiveJobs()
+        
+        // Then
+        assertTrue(result.isFailure)
+        val error = result.exceptionOrNull()
+        assertNotNull(error)
+        assertTrue(error?.message?.contains("Server Error") == true)
+    }
+    
+    @Test
+    fun `getActiveJobCount success - returns correct count`() = runTest {
+        // Given
+        val activeJobsResponse = """
+            [
+                {
+                    "job_id": "job_1",
+                    "recipe_id": null,
+                    "status": "QUEUED",
+                    "title": "Video 1",
+                    "transcript": null,
+                    "error_code": null,
+                    "recipe_json": null,
+                    "onscreen_text": null,
+                    "ingredient_candidates": null,
+                    "parse_errors": null,
+                    "llm_error_message": null
+                },
+                {
+                    "job_id": "job_2",
+                    "recipe_id": null,
+                    "status": "DOWNLOADING",
+                    "title": "Video 2",
+                    "transcript": null,
+                    "error_code": null,
+                    "recipe_json": null,
+                    "onscreen_text": null,
+                    "ingredient_candidates": null,
+                    "parse_errors": null,
+                    "llm_error_message": null
+                }
+            ]
+        """.trimIndent()
+        
+        mockWebServer.enqueue(MockResponse()
+            .setResponseCode(200)
+            .setBody(activeJobsResponse)
+            .addHeader("Content-Type", "application/json"))
+        
+        // When
+        val result = ingestRepository.getActiveJobCount()
+        
+        // Then
+        assertTrue(result.isSuccess)
+        val count = result.getOrNull()
+        assertEquals(2, count)
+    }
 } 

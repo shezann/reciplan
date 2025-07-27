@@ -35,6 +35,7 @@ fun MainScreen(
     onNavigateToCreateRecipe: () -> Unit,
     onNavigateToRecipeDetail: (String) -> Unit,
     onNavigateToEditRecipe: (String) -> Unit,
+    onNavigateToAddFromTikTok: () -> Unit,
     onNavigateToLogin: () -> Unit,
     viewModelFactory: ViewModelProvider.Factory,
     modifier: Modifier = Modifier
@@ -96,7 +97,9 @@ fun MainScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) {
-                HomeScreen()
+                HomeScreen(
+                    onNavigateToAddFromTikTok = onNavigateToAddFromTikTok
+                )
             }
             
             composable(BottomNavItem.Recipes.route) {

@@ -5,8 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.reciplan.data.auth.AuthRepository
 import com.example.reciplan.data.auth.AuthResult
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.auth.api.identity.SignInCredential
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,31 +66,16 @@ class AuthViewModel(
         }
     }
 
-    fun getGoogleSignInIntent(): android.content.Intent? {
-        return try {
-            val googleSignInClient = authRepository.getGoogleSignInClient()
-            googleSignInClient.signInIntent
-        } catch (e: Exception) {
-            _authState.value = AuthResult.Error("Google sign-in failed: ${e.message}")
-            null
-        }
-    }
+    fun getSignInClient() = authRepository.getSignInClient()
 
     fun setLoading() {
         _authState.value = AuthResult.Loading
     }
 
-    fun handleGoogleSignInResult(data: android.content.Intent?) {
+    fun handleGoogleSignInResult(credential: SignInCredential) {
         viewModelScope.launch {
-            try {
-                val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-                val account = task.getResult(ApiException::class.java)
-                
-                authRepository.signInWithGoogle(account).collect { result ->
-                    _authState.value = result
-                }
-            } catch (e: ApiException) {
-                _authState.value = AuthResult.Error("Google sign-in failed: ${e.message}")
+            authRepository.signInWithGoogle(credential).collect { result ->
+                _authState.value = result
             }
         }
     }
@@ -100,57 +84,41 @@ class AuthViewModel(
         viewModelScope.launch {
             _usernameState.value = UsernameState.Checking
             
-            val result = authRepository.checkUsernameAvailability(username)
-            result.fold(
-                onSuccess = { available ->
-                    _usernameState.value = if (available) {
-                        UsernameState.Available
-                    } else {
-                        UsernameState.Unavailable
-                    }
-                },
-                onFailure = { error ->
-                    _usernameState.value = UsernameState.Error(error.message ?: "Unknown error")
+            try {
+                val isAvailable = authRepository.checkUsernameAvailability(username)
+                _usernameState.value = if (isAvailable) {
+                    UsernameState.Available
+                } else {
+                    UsernameState.Taken
                 }
-            )
+            } catch (e: Exception) {
+                _usernameState.value = UsernameState.Error(e.message ?: "Unknown error")
+            }
         }
     }
 
-    fun setupUser(
-        username: String,
-        dietaryRestrictions: List<String> = emptyList(),
-        preferences: Map<String, String> = emptyMap()
-    ) {
+    fun setupUser(username: String, dietaryRestrictions: List<String> = emptyList(), preferences: Map<String, String> = emptyMap()) {
         viewModelScope.launch {
-            _usernameState.value = UsernameState.Setting
+            _authState.value = AuthResult.Loading
             
-            val result = authRepository.setupUser(username, dietaryRestrictions, preferences)
-            result.fold(
-                onSuccess = { user ->
-                    _usernameState.value = UsernameState.Set
-                    _authState.value = AuthResult.Success(user)
-                },
-                onFailure = { error ->
-                    _usernameState.value = UsernameState.Error(error.message ?: "Failed to setup user")
-                }
-            )
+            try {
+                val user = authRepository.setupUser(username, dietaryRestrictions, preferences)
+                _authState.value = AuthResult.Success(user)
+            } catch (e: Exception) {
+                _authState.value = AuthResult.Error(e.message ?: "Failed to setup user")
+            }
         }
     }
 
     fun signOut() {
         viewModelScope.launch {
             authRepository.signOut()
-            _authState.value = AuthResult.Loading
+            _authState.value = AuthResult.Error("User not authenticated")
         }
     }
 
-    // Method to clear all authentication state and force fresh login
-    fun clearAuthenticationState() {
-        viewModelScope.launch {
-            println("AuthViewModel: Clearing all authentication state")
-            authRepository.signOut()
-            _authState.value = AuthResult.Error("Please sign in again")
-        }
+    fun clearUsernameState() {
+        _usernameState.value = UsernameState.Idle
     }
 }
 
@@ -158,8 +126,6 @@ sealed class UsernameState {
     object Idle : UsernameState()
     object Checking : UsernameState()
     object Available : UsernameState()
-    object Unavailable : UsernameState()
-    object Setting : UsernameState()
-    object Set : UsernameState()
+    object Taken : UsernameState()
     data class Error(val message: String) : UsernameState()
 } 

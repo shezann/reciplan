@@ -23,4 +23,11 @@ interface IngestApi {
     suspend fun pollJob(
         @Path("id") jobId: String
     ): Response<IngestJobDto>
+    
+    /**
+     * Get all active jobs for the current user
+     * GET /ingest/jobs/active
+     */
+    @GET("ingest/jobs/active")
+    suspend fun getActiveJobs(): Response<List<IngestJobDto>>
 } 

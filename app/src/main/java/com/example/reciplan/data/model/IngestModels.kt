@@ -2,6 +2,7 @@ package com.example.reciplan.data.model
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.json.JsonElement
 
 // Status enum for ingest job states
 @Serializable
@@ -69,7 +70,7 @@ enum class IngestErrorCode {
 @Serializable
 data class IngestJobDto(
     @SerialName("job_id")
-    val jobId: String,
+    val jobId: String? = null,
     
     @SerialName("recipe_id")
     val recipeId: String? = null,
@@ -84,7 +85,7 @@ data class IngestJobDto(
     val errorCode: IngestErrorCode? = null,
     
     @SerialName("recipe_json")
-    val recipeJson: String? = null,
+    val recipeJson: JsonElement? = null,
     
     @SerialName("onscreen_text")
     val onscreenText: String? = null,

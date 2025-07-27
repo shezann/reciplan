@@ -27,12 +27,15 @@ import com.example.reciplan.ui.recipe.RecipeScreenDevelopment
 import com.example.reciplan.ui.recipe.RecipeScreenDebug
 import com.example.reciplan.ui.main.MainScreen
 import com.example.reciplan.ui.splash.SplashScreen
+import com.example.reciplan.ui.ingest.AddFromTikTokScreen
+import com.example.reciplan.ui.ingest.IngestStatusScreen
 import com.example.reciplan.ui.theme.ReciplanTheme
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import com.example.reciplan.ui.auth.AuthViewModel
 import com.example.reciplan.ui.recipe.RecipeViewModel
 import com.example.reciplan.ui.splash.SplashViewModel
+import com.example.reciplan.ui.ingest.AddFromTikTokViewModel
 import androidx.lifecycle.ViewModel
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CoroutineScope
@@ -105,6 +108,9 @@ class ViewModelFactory(private val appContainer: com.example.reciplan.di.AppCont
             }
             RecipeViewModel::class.java -> {
                 RecipeViewModel(appContainer.recipeRepository) as T
+            }
+            AddFromTikTokViewModel::class.java -> {
+                AddFromTikTokViewModel.getSharedInstance(appContainer.ingestRepository) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: $modelClass")
         }
@@ -182,9 +188,43 @@ fun ReciplanApp() {
                 onNavigateToEditRecipe = { recipeId ->
                     navController.navigate("edit_recipe/$recipeId")
                 },
+                onNavigateToAddFromTikTok = {
+                    navController.navigate("add_from_tiktok")
+                },
                 onNavigateToLogin = {
                     navController.navigate("login") {
                         popUpTo("main") { inclusive = true }
+                    }
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+        composable("add_from_tiktok") {
+            AddFromTikTokScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToStatus = { jobId ->
+                    navController.navigate("ingest_status/$jobId")
+                },
+                viewModelFactory = viewModelFactory
+            )
+        }
+        
+        composable(
+            route = "ingest_status/{jobId}",
+            arguments = listOf(navArgument("jobId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val jobId = backStackEntry.arguments?.getString("jobId") ?: ""
+            IngestStatusScreen(
+                jobId = jobId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToDraftPreview = { recipeId ->
+                    navController.navigate("recipe_detail/$recipeId") {
+                        popUpTo("add_from_tiktok") { inclusive = true }
                     }
                 },
                 viewModelFactory = viewModelFactory
