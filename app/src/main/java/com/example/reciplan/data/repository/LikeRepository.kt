@@ -3,10 +3,15 @@ package com.example.reciplan.data.repository
 import com.example.reciplan.data.api.RecipeApi
 import com.example.reciplan.data.model.LikeResponse
 import com.example.reciplan.data.model.LikedStatusResponse
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
@@ -37,6 +42,64 @@ class LikeRepository(
     // Cache for like states to support optimistic updates
     private val _likeStates = MutableStateFlow<Map<String, LikeState>>(emptyMap())
     val likeStates: StateFlow<Map<String, LikeState>> = _likeStates.asStateFlow()
+    
+    // Cache individual recipe StateFlows to avoid recreating them
+    private val recipeStateFlows = ConcurrentHashMap<String, StateFlow<LikeState>>()
+    
+    /**
+     * Get like state for a specific recipe
+     * Returns StateFlow that updates when like state changes
+     * Uses caching to avoid creating multiple flows for the same recipe
+     */
+    fun getLikeState(recipeId: String): StateFlow<LikeState> {
+        return recipeStateFlows.getOrPut(recipeId) {
+            likeStates.map { statesMap ->
+                statesMap[recipeId] ?: LikeState()
+            }.stateIn(
+                scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()),
+                started = SharingStarted.Lazily,
+                initialValue = LikeState()
+            )
+        }
+    }
+    
+    /**
+     * Optimistically update like state in cache
+     * Used by PagingRecipeRepository for immediate UI updates
+     */
+    fun updateLikeStateOptimistically(recipeId: String, liked: Boolean, likesCount: Int) {
+        val currentStates = _likeStates.value.toMutableMap()
+        currentStates[recipeId] = LikeState(
+            liked = liked,
+            likesCount = likesCount,
+            isLoading = false,
+            error = null
+        )
+        _likeStates.value = currentStates
+    }
+    
+    /**
+     * Refresh like state from server
+     * Used when resolving conflicts or ensuring data consistency
+     */
+    suspend fun refreshLikeState(recipeId: String): Result<LikedStatusResponse> {
+        return try {
+            val response = recipeApi.getLikedStatus(recipeId)
+            if (response.isSuccessful) {
+                val likedStatus = response.body()!!
+                updateLikeStateOptimistically(
+                    recipeId,
+                    likedStatus.liked,
+                    likedStatus.likesCount
+                )
+                Result.success(likedStatus)
+            } else {
+                Result.failure(Exception("Failed to refresh like state: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
     
     // Retry configuration
     private val maxRetries = 3
@@ -164,13 +227,6 @@ class LikeRepository(
     }
     
     /**
-     * Get the current like state for a specific recipe
-     */
-    fun getLikeState(recipeId: String): StateFlow<LikeState> {
-        return MutableStateFlow(getCurrentLikeState(recipeId)).asStateFlow()
-    }
-    
-    /**
      * Clear error state for a recipe
      */
     fun clearError(recipeId: String) {
@@ -198,7 +254,7 @@ class LikeRepository(
     ): Result<LikeResponse> {
         var lastException: Exception? = null
         
-        repeat(maxRetries) { attempt ->
+        for (attempt in 0 until maxRetries) {
             try {
                 val response = apiCall()
                 
@@ -270,4 +326,4 @@ class LikeRepository(
             else -> exception
         }
     }
-} 
+}

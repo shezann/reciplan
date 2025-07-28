@@ -8,14 +8,18 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.reciplan.ReciplanApplication
 import com.example.reciplan.ui.home.HomeScreen
+import com.example.reciplan.ui.home.HomeViewModel
 import com.example.reciplan.ui.profile.ProfileScreen
 import com.example.reciplan.ui.recipe.RecipeScreen
 
@@ -97,7 +101,15 @@ fun MainScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) {
-                HomeScreen()
+                val context = LocalContext.current
+                val application = context.applicationContext as ReciplanApplication
+                val homeViewModel: HomeViewModel = viewModel {
+                    application.appContainer.createHomeViewModel()
+                }
+                HomeScreen(
+                    viewModel = homeViewModel,
+                    onRecipeClick = onNavigateToRecipeDetail
+                )
             }
             
             composable(BottomNavItem.Recipes.route) {

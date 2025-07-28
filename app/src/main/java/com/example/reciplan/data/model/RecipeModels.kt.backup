@@ -26,10 +26,7 @@ data class Recipe(
     @SerialName("is_public") val isPublic: Boolean = true,
     @SerialName("user_id") val userId: String,
     @SerialName("created_at") val createdAt: String,
-    @SerialName("updated_at") val updatedAt: String,
-    // Like feature fields
-    val liked: Boolean = false,
-    @SerialName("likes_count") val likesCount: Int = 0
+    @SerialName("updated_at") val updatedAt: String
 )
 
 @Parcelize
@@ -110,7 +107,7 @@ data class DeleteRecipeResponse(
 // Like-related DTOs
 @Serializable
 data class LikeResponse(
-    val success: Boolean = true, // Made optional with default value
+    val success: Boolean,
     val liked: Boolean,
     @SerialName("likes_count") val likesCount: Int,
     @SerialName("recipe_id") val recipeId: String

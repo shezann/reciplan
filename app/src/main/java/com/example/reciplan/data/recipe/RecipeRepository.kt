@@ -284,6 +284,39 @@ class RecipeRepository(
         }
     }
     
+    // Get my recipes - recipes user created OR liked
+    suspend fun getMyRecipes(page: Int = 1, limit: Int = 10): Result<RecipeFeedResponse> {
+        return try {
+            println("RecipeRepository: Getting my recipes - page: $page, limit: $limit")
+            
+            val response = recipeApi.getMyRecipes(page, limit)
+            println("RecipeRepository: My recipes response code: ${response.code()}")
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                println("RecipeRepository: My recipes response body: $body")
+                if (body != null) {
+                    println("RecipeRepository: My recipes returned ${body.recipes.size} recipes")
+                    body.recipes.forEach { recipe ->
+                        println("RecipeRepository: My Recipe - ID: ${recipe.id}, Title: ${recipe.title}, Liked: ${recipe.liked}, CreatedByMe: ${recipe.userId}")
+                    }
+                    Result.success(body)
+                } else {
+                    println("RecipeRepository: Empty response body despite successful my-recipes response")
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                val errorBody = response.errorBody()?.string()
+                println("RecipeRepository: My recipes error response body: $errorBody")
+                Result.failure(handleError(response))
+            }
+        } catch (e: Exception) {
+            println("RecipeRepository: Exception getting my recipes: ${e.message}")
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+    
     // Flow-based recipe feed for UI consumption
     fun getRecipeFeedFlow(page: Int = 1, limit: Int = 10): Flow<Result<RecipeFeedResponse>> = flow {
         emit(getRecipeFeed(page, limit))

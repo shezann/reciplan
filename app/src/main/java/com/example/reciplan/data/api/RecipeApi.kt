@@ -50,6 +50,13 @@ interface RecipeApi {
         @Query("limit") limit: Int = 10
     ): Response<SavedRecipesResponse>
     
+    // My Recipes endpoint - shows recipes user created OR liked
+    @GET("api/recipes/my-recipes")
+    suspend fun getMyRecipes(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 10
+    ): Response<RecipeFeedResponse>
+    
     // Like operations
     @POST("api/recipes/{id}/like")
     suspend fun likeRecipe(

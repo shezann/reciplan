@@ -120,8 +120,11 @@ dependencies {
     // Image Loading
     implementation(libs.coil.compose)
 
-    // Accompanist
-    implementation(libs.accompanist.swiperefresh)
+    // Paging
+    implementation(libs.paging.runtime)
+    implementation(libs.paging.compose)
+
+    // Note: Accompanist SwipeRefresh replaced with Material 3 PullToRefreshBox
 
     // Testing
     testImplementation(libs.junit)
