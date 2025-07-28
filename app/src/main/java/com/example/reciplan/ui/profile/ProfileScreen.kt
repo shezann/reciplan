@@ -22,6 +22,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.reciplan.ui.auth.AuthViewModel
 import com.example.reciplan.data.auth.AuthResult
+import com.example.reciplan.ui.theme.AppShapes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,12 +65,14 @@ fun ProfileScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                // Profile Header
+                // Profile Header with modern styling
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = AppShapes.LargeShape,
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier
@@ -77,11 +80,11 @@ fun ProfileScreen(
                             .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Profile Picture Placeholder
+                        // Profile Picture Placeholder with subtle styling
                         Surface(
                             modifier = Modifier.size(80.dp),
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Person,
@@ -95,28 +98,28 @@ fun ProfileScreen(
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        // Username
+                        // Username with proper contrast
                         Text(
                             text = user?.username ?: "Guest User",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         
-                        // Email
+                        // Email with secondary text color
                         Text(
                             text = user?.email ?: "guest@example.com",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        // Edit Profile Button
+                        // Edit Profile Button with primary styling
                         OutlinedButton(
                             onClick = { /* TODO: Navigate to edit profile */ },
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                contentColor = MaterialTheme.colorScheme.primary
                             )
                         ) {
                             Icon(
@@ -132,9 +135,11 @@ fun ProfileScreen(
             }
             
             item {
-                // User Stats
+                // User Stats with consistent styling
                 Card(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = AppShapes.LargeShape,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp)
@@ -208,9 +213,11 @@ fun ProfileScreen(
             }
             
             item {
-                // Account Settings
+                // Account Settings with consistent styling
                 Card(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = AppShapes.LargeShape,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp)
@@ -254,9 +261,11 @@ fun ProfileScreen(
             }
             
             item {
-                // User Info Card
+                // Account Details with consistent styling
                 Card(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = AppShapes.LargeShape,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp)

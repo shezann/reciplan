@@ -3,9 +3,11 @@ package com.example.reciplan.ui.recipe
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,6 +33,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -73,6 +76,40 @@ fun RecipeDetailScreen(
     var isImageExpanded by remember { mutableStateOf(false) }
     var ingredientCheckStates by remember { mutableStateOf(mapOf<String, Boolean>()) }
     
+    // Navigation protection state - shared between system back and UI back button
+    var isNavigating by remember { mutableStateOf(false) }
+    
+    // Debounced navigation function
+    val performNavigation = remember {
+        {
+            if (!isNavigating) {
+                println("Navigation triggered - starting navigation")
+                isNavigating = true
+                try {
+                    onNavigateBack()
+                    println("onNavigateBack() call completed successfully")
+                } catch (e: Exception) {
+                    println("Error in onNavigateBack(): ${e.message}")
+                    // Reset navigation state on error so user can try again
+                    isNavigating = false
+                }
+            } else {
+                println("Navigation triggered - already in progress, ignoring")
+            }
+        }
+    }
+    
+    // Timeout to reset navigation state if it gets stuck
+    LaunchedEffect(isNavigating) {
+        if (isNavigating) {
+            kotlinx.coroutines.delay(3000) // 3 second timeout
+            if (isNavigating) {
+                println("Navigation timeout - resetting navigation state")
+                isNavigating = false
+            }
+        }
+    }
+    
     // Load the recipe when screen opens
     LaunchedEffect(recipeId) {
         viewModel.getRecipe(recipeId)
@@ -83,6 +120,12 @@ fun RecipeDetailScreen(
         selectedRecipe?.ingredients?.let { ingredients ->
             ingredientCheckStates = ingredients.associate { "${it.quantity} ${it.name}" to false }
         }
+    }
+    
+    // Handle system back button with same debouncing protection
+    BackHandler {
+        println("System back button pressed")
+        performNavigation()
     }
     
     Box(
@@ -195,13 +238,14 @@ fun RecipeDetailScreen(
         
 
         
-        // Enhanced back button overlay with improved positioning
+        // Enhanced back button overlay with improved positioning - moved to end for guaranteed layering
         EnhancedBackButton(
-            onNavigateBack = onNavigateBack,
+            onNavigateBack = performNavigation,
+            isNavigating = isNavigating,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(20.dp)
-                .zIndex(15f) // Higher z-index to ensure it's on top
+                .padding(16.dp)
+                .zIndex(50f) // Maximum z-index to ensure it's always on top
         )
     }
 }
@@ -729,32 +773,55 @@ private fun NutritionItem(
 
 
 /**
- * Enhanced Back Button with improved styling and better touch targets
+ * Enhanced Back Button with debouncing and navigation protection
  */
 @Composable
 private fun EnhancedBackButton(
     onNavigateBack: () -> Unit,
+    isNavigating: Boolean,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier
-            .size(48.dp), // Ensure minimum touch target size
-        shape = CircleShape,
-        color = Color.Black.copy(alpha = 0.6f),
-        shadowElevation = 4.dp
-    ) {
-        IconButton(
-            onClick = {
-                println("Back button clicked!") // Debug log
+    val hapticFeedback = LocalHapticFeedback.current
+    
+    // Click handler with haptic feedback
+    val handleClick = remember(onNavigateBack) {
+        {
+            if (!isNavigating) {
+                println("Enhanced back button clicked")
+                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 onNavigateBack()
-            },
-            modifier = Modifier.fillMaxSize()
-        ) {
+            } else {
+                println("Enhanced back button clicked - navigation already in progress, ignoring")
+            }
+        }
+    }
+    
+    IconButton(
+        onClick = handleClick,
+        enabled = !isNavigating, // Disable button when navigation is in progress
+        modifier = modifier
+            .size(56.dp) // Larger touch target for better accessibility
+            .background(
+                color = if (isNavigating) 
+                    Color.Black.copy(alpha = 0.4f) 
+                else 
+                    Color.Black.copy(alpha = 0.7f),
+                shape = CircleShape
+            )
+    ) {
+        if (isNavigating) {
+            // Show loading indicator when navigation is in progress
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = Color.White,
+                strokeWidth = 2.dp
+            )
+        } else {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
+                contentDescription = "Navigate back",
                 tint = Color.White,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(28.dp) // Larger icon for better visibility
             )
         }
     }
