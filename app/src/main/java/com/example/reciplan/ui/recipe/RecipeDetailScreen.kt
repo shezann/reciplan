@@ -140,6 +140,7 @@ fun RecipeDetailScreen(
                 )
             )
     ) {
+        // Main content layer
         if (uiState.isLoading) {
             EnhancedLoadingState()
         } else if (selectedRecipe != null) {
@@ -152,8 +153,7 @@ fun RecipeDetailScreen(
                     EnhancedImageGallery(
                         recipe = selectedRecipe!!,
                         isExpanded = isImageExpanded,
-                        onExpandToggle = { isImageExpanded = !isImageExpanded },
-                        onNavigateBack = onNavigateBack
+                        onExpandToggle = { isImageExpanded = !isImageExpanded }
                     )
                 }
                 
@@ -177,14 +177,14 @@ fun RecipeDetailScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                 }
                 
+                // Subtask 112: Enhanced Ingredient Checklist
                 item {
-                    // Subtask 112: Ingredient Checklist Integration
                     EnhancedIngredientsSection(
                         ingredients = selectedRecipe!!.ingredients,
                         checkStates = ingredientCheckStates,
-                        onCheckChange = { ingredient, isChecked ->
+                        onCheckChanged = { ingredient, checked ->
                             ingredientCheckStates = ingredientCheckStates.toMutableMap().apply {
-                                this[ingredient] = isChecked
+                                put(ingredient, checked)
                             }
                         },
                         modifier = Modifier.padding(horizontal = 20.dp)
@@ -192,11 +192,11 @@ fun RecipeDetailScreen(
                 }
                 
                 item {
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
                 
+                // Instructions Section
                 item {
-                    // Enhanced Instructions Section
                     EnhancedInstructionsSection(
                         instructions = selectedRecipe!!.instructions,
                         modifier = Modifier.padding(horizontal = 20.dp)
@@ -235,18 +235,44 @@ fun RecipeDetailScreen(
                 onRetry = { viewModel.getRecipe(recipeId) }
             )
         }
-        
-
-        
-        // Enhanced back button overlay with improved positioning - moved to end for guaranteed layering
+    }
+    
+    // Separate overlay container for the back button - completely independent layer
+    Box(
+        modifier = modifier.fillMaxSize()
+    ) {
+        // Enhanced back button overlay - in its own composition layer
         EnhancedBackButton(
             onNavigateBack = performNavigation,
             isNavigating = isNavigating,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(16.dp)
-                .zIndex(50f) // Maximum z-index to ensure it's always on top
         )
+        
+        // Temporary debug area to verify touch isolation (remove after testing)
+        if (uiState.error != null) { // Only show when there's an error to avoid cluttering
+            Surface(
+                onClick = {
+                    println("DEBUG: Touch area verification - back button area is responsive")
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .size(56.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Debug touch test",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .padding(14.dp)
+                )
+            }
+        }
     }
 }
 
@@ -260,7 +286,6 @@ private fun EnhancedImageGallery(
     recipe: Recipe,
     isExpanded: Boolean,
     onExpandToggle: () -> Unit,
-    onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val hapticFeedback = LocalHapticFeedback.current
@@ -494,7 +519,7 @@ private fun EnhancedMetadataItem(
 private fun EnhancedIngredientsSection(
     ingredients: List<com.example.reciplan.data.model.Ingredient>,
     checkStates: Map<String, Boolean>,
-    onCheckChange: (String, Boolean) -> Unit,
+    onCheckChanged: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -567,7 +592,7 @@ private fun EnhancedIngredientsSection(
                             name = "${ingredient.quantity} ${ingredient.name}",
                             isChecked = isChecked
                         ),
-                        onCheckedChange = { onCheckChange(ingredientKey, !isChecked) },
+                        onCheckedChange = { onCheckChanged(ingredientKey, !isChecked) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     
@@ -787,42 +812,46 @@ private fun EnhancedBackButton(
     val handleClick = remember(onNavigateBack) {
         {
             if (!isNavigating) {
-                println("Enhanced back button clicked")
+                println("🔙 Enhanced back button clicked - performing navigation")
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 onNavigateBack()
             } else {
-                println("Enhanced back button clicked - navigation already in progress, ignoring")
+                println("🔙 Enhanced back button clicked - navigation already in progress, ignoring")
             }
         }
     }
     
-    IconButton(
+    Surface(
         onClick = handleClick,
-        enabled = !isNavigating, // Disable button when navigation is in progress
+        enabled = !isNavigating,
         modifier = modifier
-            .size(56.dp) // Larger touch target for better accessibility
-            .background(
-                color = if (isNavigating) 
-                    Color.Black.copy(alpha = 0.4f) 
-                else 
-                    Color.Black.copy(alpha = 0.7f),
-                shape = CircleShape
-            )
+            .size(64.dp), // Even larger touch target
+        shape = CircleShape,
+        color = if (isNavigating) 
+            Color.Black.copy(alpha = 0.4f) 
+        else 
+            Color.Black.copy(alpha = 0.8f), // More opaque for better visibility
+        shadowElevation = 8.dp // Add shadow for prominence
     ) {
-        if (isNavigating) {
-            // Show loading indicator when navigation is in progress
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                color = Color.White,
-                strokeWidth = 2.dp
-            )
-        } else {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Navigate back",
-                tint = Color.White,
-                modifier = Modifier.size(28.dp) // Larger icon for better visibility
-            )
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isNavigating) {
+                // Show loading indicator when navigation is in progress
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = Color.White,
+                    strokeWidth = 3.dp
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Navigate back",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp) // Larger icon for better visibility
+                )
+            }
         }
     }
 }
