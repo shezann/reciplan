@@ -123,6 +123,9 @@ class ViewModelFactory(private val appContainer: com.example.reciplan.di.AppCont
             DraftPreviewViewModel::class.java -> {
                 appContainer.createDraftPreviewViewModel() as T
             }
+            com.example.reciplan.ui.profile.ProfileViewModel::class.java -> {
+                appContainer.createProfileViewModel() as T
+            }
             else -> throw IllegalArgumentException("Unknown ViewModel class: $modelClass")
         }
     }

@@ -113,6 +113,10 @@ class AppContainer(private val context: Context) {
         return com.example.reciplan.ui.draft.DraftPreviewViewModel(ingestRepository, recipeRepository)
     }
     
+    fun createProfileViewModel(): com.example.reciplan.ui.profile.ProfileViewModel {
+        return com.example.reciplan.ui.profile.ProfileViewModel(recipeRepository, likeRepository)
+    }
+    
     // For debug/testing purposes
     fun provideTokenManager(): TokenManager = tokenManager
 } 
