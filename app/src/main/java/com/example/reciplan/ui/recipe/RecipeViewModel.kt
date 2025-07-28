@@ -2,15 +2,20 @@ package com.example.reciplan.ui.recipe
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.reciplan.data.auth.AuthRepository
 import com.example.reciplan.data.model.*
 import com.example.reciplan.data.recipe.RecipeRepository
+import com.example.reciplan.data.repository.LikeRepository
+import com.example.reciplan.data.repository.LikeState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class RecipeViewModel(
-    private val recipeRepository: RecipeRepository
+    private val recipeRepository: RecipeRepository,
+    private val likeRepository: LikeRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
     
     // UI State
@@ -25,12 +30,35 @@ class RecipeViewModel(
     private val _selectedRecipe = MutableStateFlow<Recipe?>(null)
     val selectedRecipe: StateFlow<Recipe?> = _selectedRecipe.asStateFlow()
     
+    // Current user data for filtering
+    private var currentUser: User? = null
+    
     // Pagination state
     private var currentPage = 1
     private var isLastPage = false
     
     init {
+        loadCurrentUser()
         loadRecipes()
+        
+        // Update filtered recipes when like states change
+        viewModelScope.launch {
+            likeRepository.likeStates.collect { _ ->
+                // Refresh filtering when any like state changes
+                updateFilteredRecipes()
+            }
+        }
+    }
+    
+    // Load current user data for filtering
+    private fun loadCurrentUser() {
+        viewModelScope.launch {
+            currentUser = authRepository.getCurrentUserData()
+            println("🔧 LOADED CURRENT USER: ${currentUser?.id} (${currentUser?.email})")
+            
+            // Refresh filtering after user data is loaded
+            updateFilteredRecipes()
+        }
     }
     
     // Load recipes from the feed
@@ -50,6 +78,9 @@ class RecipeViewModel(
                     currentPage++
                     isLastPage = response.recipes.size < 10
                     _uiState.value = _uiState.value.copy(isLoading = false, error = null)
+                    
+                    // Apply filtering after loading recipes
+                    updateFilteredRecipes()
                 },
                 onFailure = { error ->
                     _uiState.value = _uiState.value.copy(isLoading = false, error = error.message)
@@ -94,9 +125,52 @@ class RecipeViewModel(
     // Helper function to check if a recipe matches the current filter criteria
     private fun recipeMatchesCurrentFilter(recipe: Recipe): Boolean {
         val state = _uiState.value
+        val currentUserId = getCurrentUserId()
+        
+        // Get real-time like state (not static API field)
+        val currentLikeState = likeRepository.likeStates.value[recipe.id]
+        val isCurrentlyLiked = currentLikeState?.liked ?: recipe.liked // Fallback to API field if no live state
+        
+        // Debug logging for "All" filter (key debugging only)
+        if (state.selectedFilter == "All" || state.selectedFilter.isEmpty()) {
+            // Special debugging for the problematic recipe only
+            if (recipe.id == "fcd08e90-8cf6-4a8f-a0de-11b1484d6f57") {
+                val isCreatedByUser = recipe.userId == currentUserId
+                val shouldShow = isCreatedByUser || isCurrentlyLiked
+                println("🚨 PROBLEMATIC RECIPE - Should show: $shouldShow (created: $isCreatedByUser, liked: $isCurrentlyLiked)")
+            }
+        }
+        
         val filterMatch = when (state.selectedFilter) {
-            "All", "" -> true
-            "My Recipes" -> recipe.userId == "IbMRwrirqeyObTyqc9Aa"
+            "All", "" -> {
+                // Show created OR currently liked recipes
+                // Handle null/empty userIds safely
+                val isCreated = !currentUserId.isNullOrEmpty() && recipe.userId.isNotEmpty() && recipe.userId == currentUserId
+                val result = isCreated || isCurrentlyLiked
+                
+                // Extra debug for problematic recipe
+                if (recipe.id == "fcd08e90-8cf6-4a8f-a0de-11b1484d6f57") {
+                    println("🚨 FILTER MATCH CALCULATION:")
+                    println("  currentUserId.isNullOrEmpty(): ${currentUserId.isNullOrEmpty()}")
+                    println("  recipe.userId.isEmpty(): ${recipe.userId.isEmpty()}")
+                    println("  isCreated: $isCreated")
+                    println("  isCurrentlyLiked: $isCurrentlyLiked")
+                    println("  Final result: $result")
+                }
+                
+                result
+            }
+            "My Recipes" -> {
+                // Show ONLY created recipes
+                val result = !currentUserId.isNullOrEmpty() && recipe.userId.isNotEmpty() && recipe.userId == currentUserId
+                
+                // Debug logging for My Recipes filter
+                if (!result) {
+                    println("📝 MY RECIPES - FILTERED OUT: '${recipe.title}' (owner: '${recipe.userId}', you: '$currentUserId')")
+                }
+                
+                result
+            }
             else -> recipe.tags.any { it.equals(state.selectedFilter, ignoreCase = true) }
         }
         val searchMatch = state.searchQuery.isEmpty() ||
@@ -109,12 +183,13 @@ class RecipeViewModel(
     // Helper to update filteredRecipes after any change
     private fun updateFilteredRecipes() {
         val state = _uiState.value
-        val shouldShowFiltered = state.filteredRecipes.isNotEmpty() || state.searchQuery.isNotEmpty() || state.selectedFilter != "All"
-        val newFiltered = if (shouldShowFiltered) {
-            _recipeFeed.value.filter { recipeMatchesCurrentFilter(it) }
-        } else {
-            emptyList()
-        }
+        println("🔧 FILTERING: '${state.selectedFilter}' → ${_recipeFeed.value.size} recipes")
+        
+        // Always apply filtering logic (including "All" for personalized feed)
+        val newFiltered = _recipeFeed.value.filter { recipeMatchesCurrentFilter(it) }
+        
+        println("🔧 RESULT: ${newFiltered.size} recipes shown: ${newFiltered.map { it.title }}")
+        
         _uiState.value = state.copy(filteredRecipes = newFiltered)
     }
 
@@ -225,42 +300,24 @@ class RecipeViewModel(
     
     // Filter recipes by tags
     fun filterRecipesByTag(tag: String) {
-        val filteredRecipes = if (tag.isEmpty() || tag == "All") {
-            _recipeFeed.value
-        } else if (tag == "My Recipes") {
-            // Filter for user-created recipes (userId matches current user)
-            val userRecipes = _recipeFeed.value.filter { recipe ->
-                recipe.userId == "IbMRwrirqeyObTyqc9Aa" // Current user's ID
-            }
-            userRecipes
-        } else {
-            _recipeFeed.value.filter { recipe ->
-                recipe.tags.any { it.equals(tag, ignoreCase = true) }
-            }
-        }
+        println("🎯 FILTER BY TAG CALLED: '$tag'")
         
-        _uiState.value = _uiState.value.copy(
-            filteredRecipes = filteredRecipes,
-            selectedFilter = tag
-        )
+        // Update the selected filter first
+        _uiState.value = _uiState.value.copy(selectedFilter = tag)
+        
+        // Use the new filtering logic instead of old hardcoded logic
+        updateFilteredRecipes()
     }
     
     // Search recipes
     fun searchRecipes(query: String) {
-        val searchResults = if (query.isEmpty()) {
-            _recipeFeed.value
-        } else {
-            _recipeFeed.value.filter { recipe ->
-                recipe.title.contains(query, ignoreCase = true) ||
-                recipe.description?.contains(query, ignoreCase = true) == true ||
-                recipe.tags.any { it.contains(query, ignoreCase = true) }
-            }
-        }
+        println("🔍 SEARCH RECIPES CALLED: '$query'")
         
-        _uiState.value = _uiState.value.copy(
-            filteredRecipes = searchResults,
-            searchQuery = query
-        )
+        // Update the search query first
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        
+        // Use the new filtering logic (which handles both filter and search)
+        updateFilteredRecipes()
     }
     
     // Seed recipes for development
@@ -279,6 +336,47 @@ class RecipeViewModel(
                     )
                 }
             )
+        }
+    }
+    
+    // Helper method to get current backend user ID (not Firebase ID)
+    private fun getCurrentUserId(): String? {
+        return currentUser?.id?.takeIf { it.isNotEmpty() }
+    }
+    
+    // Get like state for a specific recipe (real-time)
+    fun getLikeState(recipeId: String): StateFlow<LikeState> {
+        return likeRepository.getLikeState(recipeId)
+    }
+    
+    // Toggle like status for a recipe
+    fun toggleLike(recipeId: String, currentlyLiked: Boolean) {
+        viewModelScope.launch {
+            println("🔧 RECIPE SCREEN - TOGGLE LIKE: $recipeId, currently: $currentlyLiked")
+            
+            val result = likeRepository.toggleLike(recipeId, currentlyLiked)
+            result.fold(
+                onSuccess = { likeResponse ->
+                    println("🔧 RECIPE SCREEN - LIKE SUCCESS: ${likeResponse.liked}, count: ${likeResponse.likesCount}")
+                    // The real-time like state will automatically update via StateFlow
+                    // Refresh filtered recipes to ensure consistency
+                    updateFilteredRecipes()
+                },
+                onFailure = { error ->
+                    println("🔧 RECIPE SCREEN - LIKE ERROR: ${error.message}")
+                    _uiState.value = _uiState.value.copy(error = "Failed to ${if (currentlyLiked) "unlike" else "like"} recipe: ${error.message}")
+                }
+            )
+        }
+    }
+    
+    // Preload like states for better performance (similar to HomeViewModel)
+    fun preloadLikeStates(recipes: List<Recipe>) {
+        // The LikeRepository automatically manages like states, so we just need to ensure
+        // they're loaded. This could trigger loading if needed.
+        recipes.forEach { recipe ->
+            // This will create the StateFlow if it doesn't exist
+            getLikeState(recipe.id)
         }
     }
 }

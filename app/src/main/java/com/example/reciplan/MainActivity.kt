@@ -95,6 +95,12 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    
+    override fun onPause() {
+        super.onPause()
+        // Clear shared instance when app is paused to prevent stale state issues
+        AddFromTikTokViewModel.clearSharedInstance()
+    }
 }
 
 // Custom ViewModelFactory for manual DI
@@ -109,7 +115,7 @@ class ViewModelFactory(private val appContainer: com.example.reciplan.di.AppCont
                 SplashViewModel(appContainer.authApi) as T
             }
             RecipeViewModel::class.java -> {
-                RecipeViewModel(appContainer.recipeRepository) as T
+                RecipeViewModel(appContainer.recipeRepository, appContainer.likeRepository, appContainer.authRepository) as T
             }
             AddFromTikTokViewModel::class.java -> {
                 AddFromTikTokViewModel.getSharedInstance(appContainer.ingestRepository) as T

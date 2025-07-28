@@ -12,8 +12,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +29,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.reciplan.R
 import com.example.reciplan.data.model.Recipe
+import com.example.reciplan.data.repository.LikeState
+import com.example.reciplan.ui.components.LikeButton
 import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,11 +38,10 @@ import com.google.firebase.auth.FirebaseAuth
 fun RecipeCard(
     recipe: Recipe,
     onRecipeClick: (String) -> Unit,
-    onSaveClick: (String) -> Unit = {},
-    onUnsaveClick: (String) -> Unit = {},
+    onLikeClick: (String, Boolean) -> Unit = { _, _ -> },
+    likeState: LikeState = LikeState(),
     onEditClick: (String) -> Unit = {},
     onDeleteClick: (String) -> Unit = {},
-    isSaved: Boolean = false,
     isOwner: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -82,32 +81,23 @@ fun RecipeCard(
                     placeholder = painterResource(R.drawable.ic_launcher_foreground)
                 )
                 
-                // Bookmark/Save Button
+                // Like Button (replacing the old save/bookmark button)
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(12.dp)
                 ) {
-                    IconButton(
-                        onClick = { 
-                            if (isSaved) {
-                                onUnsaveClick(recipe.id)
-                            } else {
-                                onSaveClick(recipe.id)
-                            }
-                        },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(
-                                Color.White.copy(alpha = 0.9f),
-                                shape = RoundedCornerShape(8.dp)
-                            )
+                    Surface(
+                        color = Color.White.copy(alpha = 0.9f),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(
-                            imageVector = if (isSaved) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = if (isSaved) "Unsave recipe" else "Save recipe",
-                            tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(16.dp)
+                        LikeButton(
+                            isLiked = likeState.liked,
+                            likesCount = likeState.likesCount,
+                            isLoading = likeState.isLoading,
+                            onClick = { onLikeClick(recipe.id, likeState.liked) },
+                            showCount = false, // Don't show count on overlay
+                            modifier = Modifier.padding(4.dp)
                         )
                     }
                 }
@@ -208,15 +198,32 @@ fun RecipeCard(
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-                // Recipe Title
-                Text(
-                    text = recipe.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                // Recipe Title and Like Count Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = recipe.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    // Show like count here (visible when not overlaying)
+                    if (likeState.likesCount > 0) {
+                        Text(
+                            text = "${likeState.likesCount} likes",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
                 
                 // Recipe Description
                 if (!recipe.description.isNullOrEmpty()) {
@@ -285,6 +292,18 @@ fun RecipeCard(
                             }
                         }
                     }
+                }
+                
+                // Show like error if any
+                likeState.error?.let { error ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }

@@ -84,10 +84,38 @@ class AddFromTikTokViewModel(
     }
 
     /**
+     * Clear current job state (useful when starting a new import)
+     */
+    fun clearCurrentJob() {
+        stopPolling()
+        _uiState.value = _uiState.value.copy(
+            isLoading = false,
+            jobId = null,
+            jobStatus = null,
+            jobDetails = null,
+            isPolling = false,
+            currentStep = 0,
+            stepTitle = "",
+            stepDescription = "",
+            isComplete = false,
+            hasError = false,
+            errorCode = null,
+            showErrorSnackbar = false,
+            errorSnackbarMessage = null,
+            canRetry = false,
+            retryActionText = null,
+            error = null
+        )
+    }
+    
+    /**
      * Start an ingest job with the given TikTok URL
      */
     fun startIngest(url: String) {
         if (_uiState.value.isLoading) return
+        
+        // Clear any previous job state before starting new import
+        clearCurrentJob()
         
         // Fire telemetry event for ingest started
         Telemetry.ingestStarted(url)

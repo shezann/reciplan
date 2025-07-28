@@ -26,7 +26,12 @@ fun AddFromTikTokScreen(
     val viewModel: AddFromTikTokViewModel = viewModel(factory = viewModelFactory)
     val uiState by viewModel.uiState.collectAsState()
     
-    // Form state
+    // Clear any previous job state when entering the screen
+    LaunchedEffect(Unit) {
+        viewModel.clearCurrentJob()
+    }
+    
+    // Form state - starts empty each time screen is opened
     var url by remember { mutableStateOf("") }
     var urlError by remember { mutableStateOf("") }
     
@@ -53,9 +58,14 @@ fun AddFromTikTokScreen(
     }
     
     // Handle navigation to status screen when job starts
-    LaunchedEffect(uiState.jobId) {
+    // Only navigate if we have a jobId AND we're actively processing (not completed/failed)
+    LaunchedEffect(uiState.jobId, uiState.isLoading, uiState.isPolling, uiState.isComplete, uiState.hasError) {
         uiState.jobId?.let { jobId ->
-            onNavigateToStatus(jobId)
+            // Only navigate if we have a valid job that's actively being processed
+            // This prevents navigation on stale jobId from previous completed sessions
+            if ((uiState.isLoading || uiState.isPolling) && !uiState.isComplete && !uiState.hasError) {
+                onNavigateToStatus(jobId)
+            }
         }
     }
     

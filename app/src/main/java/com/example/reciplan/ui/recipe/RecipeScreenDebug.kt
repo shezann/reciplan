@@ -19,8 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.reciplan.data.model.Recipe
-import com.google.accompanist.swiperefresh.SwipeRefresh
-import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -290,8 +289,8 @@ fun RecipeScreenDebug(
         }
         
         // Recipe Feed
-        SwipeRefresh(
-            state = rememberSwipeRefreshState(uiState.isLoading),
+        PullToRefreshBox(
+            isRefreshing = uiState.isLoading,
             onRefresh = { viewModel.refreshRecipes() }
         ) {
             if (displayRecipes.isEmpty() && !uiState.isLoading) {
@@ -339,8 +338,15 @@ fun RecipeScreenDebug(
                         RecipeCard(
                             recipe = recipe,
                             onRecipeClick = onNavigateToRecipeDetail,
-                            onSaveClick = { viewModel.saveRecipe(it) },
-                            onUnsaveClick = { viewModel.unsaveRecipe(it) },
+                            onLikeClick = { recipeId, currentlyLiked -> 
+                                println("RecipeScreenDebug: Like clicked for recipe ID: $recipeId, currently liked: $currentlyLiked")
+                                // TODO: Integrate with LikeRepository when available
+                            },
+                            likeState = com.example.reciplan.data.repository.LikeState(
+                                liked = recipe.liked,
+                                likesCount = recipe.likesCount,
+                                isLoading = false
+                            ),
                             onEditClick = onNavigateToEditRecipe,
                             onDeleteClick = { recipeId ->
                                 println("RecipeScreenDebug: Delete clicked for recipe ID: $recipeId")
@@ -349,7 +355,6 @@ fun RecipeScreenDebug(
                                 showDeleteDialog = true
                                 println("RecipeScreenDebug: Delete dialog should be shown: $showDeleteDialog")
                             },
-                            isSaved = false, // You would check this against saved recipes
                             // Show actual ownership status for debugging
                             isOwner = effectiveUserId != null && recipe.userId == effectiveUserId
                         )

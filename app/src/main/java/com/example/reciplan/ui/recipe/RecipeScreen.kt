@@ -22,8 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.reciplan.data.model.Recipe
-import com.google.accompanist.swiperefresh.SwipeRefresh
-import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +30,7 @@ fun RecipeScreen(
     onNavigateToCreateRecipe: () -> Unit,
     onNavigateToRecipeDetail: (String) -> Unit,
     onNavigateToEditRecipe: (String) -> Unit,
+    onNavigateToAddFromTikTok: () -> Unit = {},
     viewModelFactory: ViewModelProvider.Factory,
     showCreateButton: Boolean = true,
     modifier: Modifier = Modifier
@@ -46,6 +46,7 @@ fun RecipeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var recipeToDelete by remember { mutableStateOf<Recipe?>(null) }
+    var showCreateMenuDropdown by remember { mutableStateOf(false) }
     
     // Get current user ID from auth state
     val currentUserId = when (val state = authState) {
@@ -56,12 +57,8 @@ fun RecipeScreen(
     // Filter options
     val filterOptions = listOf("All", "My Recipes", "Breakfast", "Lunch", "Dinner", "Dessert", "Snack")
     
-    // Display recipes - use filtered if available, otherwise use main feed
-    val displayRecipes = if (uiState.filteredRecipes.isNotEmpty() || uiState.searchQuery.isNotEmpty() || uiState.selectedFilter != "All") {
-        uiState.filteredRecipes
-    } else {
-        recipeFeed
-    }
+    // Always use filtered recipes since all filters (including "All") are now applied
+    val displayRecipes = uiState.filteredRecipes
     
     // Auto-clear messages after delay
     LaunchedEffect(uiState.error) {
@@ -108,16 +105,38 @@ fun RecipeScreen(
                     )
                     
                     if (showCreateButton) {
-                        FloatingActionButton(
-                            onClick = onNavigateToCreateRecipe,
-                            modifier = Modifier.size(48.dp),
-                            containerColor = MaterialTheme.colorScheme.primary
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Add Recipe",
-                                tint = MaterialTheme.colorScheme.onPrimary
-                            )
+                        Box {
+                            FloatingActionButton(
+                                onClick = { showCreateMenuDropdown = true },
+                                modifier = Modifier.size(48.dp),
+                                containerColor = MaterialTheme.colorScheme.primary
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Add Recipe",
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                            
+                            DropdownMenu(
+                                expanded = showCreateMenuDropdown,
+                                onDismissRequest = { showCreateMenuDropdown = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Create Recipe") },
+                                    onClick = {
+                                        showCreateMenuDropdown = false
+                                        onNavigateToCreateRecipe()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Add from TikTok") },
+                                    onClick = {
+                                        showCreateMenuDropdown = false
+                                        onNavigateToAddFromTikTok()
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -205,8 +224,8 @@ fun RecipeScreen(
         }
         
         // Recipe Feed
-        SwipeRefresh(
-            state = rememberSwipeRefreshState(uiState.isLoading),
+        PullToRefreshBox(
+            isRefreshing = uiState.isLoading,
             onRefresh = { viewModel.refreshRecipes() }
         ) {
             if (displayRecipes.isEmpty() && !uiState.isLoading) {
@@ -251,19 +270,28 @@ fun RecipeScreen(
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
                     items(displayRecipes) { recipe ->
+                        // Get real-time like state for this recipe
+                        val likeState by viewModel.getLikeState(recipe.id).collectAsState()
+                        
                         RecipeCard(
                             recipe = recipe,
                             onRecipeClick = onNavigateToRecipeDetail,
-                            onSaveClick = { viewModel.saveRecipe(it) },
-                            onUnsaveClick = { viewModel.unsaveRecipe(it) },
+                            onLikeClick = { recipeId, currentlyLiked -> 
+                                viewModel.toggleLike(recipeId, currentlyLiked)
+                            },
+                            likeState = likeState,
                             onEditClick = onNavigateToEditRecipe,
                             onDeleteClick = { recipeId ->
                                 recipeToDelete = displayRecipes.find { it.id == recipeId }
                                 showDeleteDialog = true
                             },
-                            isSaved = false, // You would check this against saved recipes
                             isOwner = currentUserId != null && recipe.userId == currentUserId
                         )
+                        
+                        // Preload like states for performance optimization
+                        LaunchedEffect(recipe) {
+                            viewModel.preloadLikeStates(listOf(recipe))
+                        }
                     }
                     
                     // Load more indicator
@@ -324,6 +352,7 @@ fun RecipeScreenDevelopment(
     onNavigateToCreateRecipe: () -> Unit,
     onNavigateToRecipeDetail: (String) -> Unit,
     onNavigateToEditRecipe: (String) -> Unit,
+    onNavigateToAddFromTikTok: () -> Unit = {},
     viewModelFactory: ViewModelProvider.Factory,
     showCreateButton: Boolean = true,
     modifier: Modifier = Modifier
@@ -362,6 +391,7 @@ fun RecipeScreenDevelopment(
             onNavigateToCreateRecipe = onNavigateToCreateRecipe,
             onNavigateToRecipeDetail = onNavigateToRecipeDetail,
             onNavigateToEditRecipe = onNavigateToEditRecipe,
+            onNavigateToAddFromTikTok = onNavigateToAddFromTikTok,
             viewModelFactory = viewModelFactory,
             showCreateButton = showCreateButton,
             modifier = Modifier.weight(1f)

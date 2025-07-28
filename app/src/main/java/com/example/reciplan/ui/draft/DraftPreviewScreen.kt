@@ -92,13 +92,20 @@ fun DraftPreviewScreen(
     }
     
     // Show success snackbar when save succeeds
-    LaunchedEffect(uiState.isSaving, uiState.hasUnsavedChanges) {
-        if (!uiState.isSaving && !uiState.hasUnsavedChanges && uiState.title.isNotEmpty()) {
-            // This indicates a successful save (not initial load)
+    LaunchedEffect(uiState.isSaving, uiState.hasUnsavedChanges, uiState.lastSaveType) {
+        if (!uiState.isSaving && !uiState.hasUnsavedChanges && uiState.lastSaveType != null && uiState.title.isNotEmpty()) {
+            // This indicates a successful save/approve operation (not initial load)
+            val message = when (uiState.lastSaveType) {
+                "approve" -> "Recipe approved successfully!"
+                "save" -> "Changes saved successfully!"
+                else -> "Recipe saved successfully!"
+            }
             snackbarHostState.showSnackbar(
-                message = "Recipe saved successfully!",
+                message = message,
                 duration = SnackbarDuration.Short
             )
+            // Clear the save type flag after showing the message
+            viewModel.clearLastSaveType()
         }
     }
     
@@ -116,12 +123,12 @@ fun DraftPreviewScreen(
                     }
                 },
                 actions = {
-                    // Save button
+                    // Save/Approve button
                     IconButton(
                         onClick = {
                             viewModel.saveRecipe(recipeId)
                         },
-                        enabled = uiState.hasUnsavedChanges && !uiState.isSaving
+                        enabled = !uiState.isSaving
                     ) {
                         if (uiState.isSaving) {
                             CircularProgressIndicator(
@@ -131,7 +138,7 @@ fun DraftPreviewScreen(
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Check,
-                                contentDescription = "Save Recipe"
+                                contentDescription = if (uiState.hasUnsavedChanges) "Save Changes" else "Approve Recipe"
                             )
                         }
                     }
@@ -164,7 +171,7 @@ fun DraftPreviewScreen(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = { viewModel.loadRecipeData(recipeId) }
+                    onClick = { viewModel.forceLoadRecipeData(recipeId) }
                 ) {
                     Text("Retry")
                 }
@@ -230,66 +237,91 @@ private fun OverviewTab(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = uiState.title.ifEmpty { "Recipe Overview" },
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                    // Editable title field
+                    OutlinedTextField(
+                        value = uiState.title,
+                        onValueChange = { viewModel.updateTitle(it) },
+                        label = { Text("Recipe Title") },
+                        placeholder = { Text("Enter recipe title") },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        )
                     )
                     
-                    if (uiState.description.isNotEmpty()) {
-                        Text(
-                            text = uiState.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    // Editable description field
+                    OutlinedTextField(
+                        value = uiState.description,
+                        onValueChange = { viewModel.updateDescription(it) },
+                        label = { Text("Description") },
+                        placeholder = { Text("Enter recipe description (optional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 4,
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Done
                         )
-                    } else if (uiState.isLoading) {
-                        Text(
-                            text = "Loading recipe details...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    )
                     
                     HorizontalDivider()
                     
-                    // Recipe metadata placeholders
+                    // Recipe metadata - editable fields
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column {
-                            Text(
-                                text = "Prep Time",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = viewModel.getFormattedPrepTime(),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Cook Time",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = viewModel.getFormattedCookTime(),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Servings",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = viewModel.getFormattedServings(),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
+                        // Prep Time
+                        OutlinedTextField(
+                            value = if (uiState.prepTime > 0) uiState.prepTime.toString() else "",
+                            onValueChange = { newValue ->
+                                val prepTime = newValue.toIntOrNull() ?: 0
+                                viewModel.updateMetadata(prepTime = prepTime)
+                            },
+                            label = { Text("Prep Time") },
+                            placeholder = { Text("30") },
+                            suffix = { Text("min") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next
+                            ),
+                            singleLine = true
+                        )
+                        
+                        // Cook Time
+                        OutlinedTextField(
+                            value = if (uiState.cookTime > 0) uiState.cookTime.toString() else "",
+                            onValueChange = { newValue ->
+                                val cookTime = newValue.toIntOrNull() ?: 0
+                                viewModel.updateMetadata(cookTime = cookTime)
+                            },
+                            label = { Text("Cook Time") },
+                            placeholder = { Text("45") },
+                            suffix = { Text("min") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next
+                            ),
+                            singleLine = true
+                        )
+                        
+                        // Servings
+                        OutlinedTextField(
+                            value = if (uiState.servings > 0) uiState.servings.toString() else "",
+                            onValueChange = { newValue ->
+                                val servings = newValue.toIntOrNull() ?: 1
+                                viewModel.updateMetadata(servings = servings)
+                            },
+                            label = { Text("Servings") },
+                            placeholder = { Text("4") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Done
+                            ),
+                            singleLine = true
+                        )
                     }
                 }
             }
@@ -361,6 +393,7 @@ private fun IngredientsTab(
                 DraggableIngredientRow(
                     ingredient = ingredient,
                     index = index,
+                    totalCount = uiState.ingredients.size,
                     onStartEditing = { viewModel.startEditingIngredient(ingredient.id) },
                     onNameChange = { newName -> viewModel.updateIngredientName(ingredient.id, newName) },
                     onQuantityChange = { newQuantity -> viewModel.updateIngredientQuantity(ingredient.id, newQuantity) },
@@ -422,7 +455,7 @@ private fun IngredientsTab(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Tap ingredients to edit • Drag to reorder",
+                        text = "Tap ingredients to edit • Long press & drag handle to reorder",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -457,12 +490,12 @@ private fun InstructionsTab(
                 
                 IconButton(
                     onClick = {
-                        // TODO: Edit instructions functionality in Task 5.3+
+                        viewModel.addNewInstruction()
                     }
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Instructions"
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add Instruction"
                     )
                 }
             }
@@ -474,7 +507,23 @@ private fun InstructionsTab(
                 DraggableInstructionRow(
                     instruction = instruction,
                     index = index,
+                    totalCount = uiState.instructions.size,
                     onReorder = { fromIndex, toIndex -> viewModel.reorderInstructions(fromIndex, toIndex) },
+                    onStartEditing = { instructionId ->
+                        viewModel.startEditingInstruction(instructionId)
+                    },
+                    onTextChange = { instructionId, newText ->
+                        viewModel.updateInstructionText(instructionId, newText)
+                    },
+                    onSaveChanges = { instructionId ->
+                        viewModel.stopEditingInstructions()
+                    },
+                    onCancelEditing = { instructionId, originalText ->
+                        viewModel.cancelInstructionEditing(instructionId, originalText)
+                    },
+                    onDelete = { instructionId ->
+                        viewModel.deleteInstruction(instructionId)
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -527,7 +576,7 @@ private fun InstructionsTab(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Tap instructions to edit • Drag to reorder",
+                                                    text = "Tap instructions to edit • Long press & drag handle to reorder",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -740,6 +789,7 @@ private fun EditableIngredientRow(
 private fun DraggableIngredientRow(
     ingredient: EditableIngredient,
     index: Int,
+    totalCount: Int,
     onStartEditing: () -> Unit,
     onNameChange: (String) -> Unit,
     onQuantityChange: (String) -> Unit,
@@ -776,8 +826,8 @@ private fun DraggableIngredientRow(
             // Drag handle
             Icon(
                 imageVector = Icons.Default.Menu,
-                contentDescription = "Drag to reorder",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                contentDescription = "Long press and drag to reorder",
+                tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .padding(8.dp)
                     .pointerInput(Unit) {
@@ -792,15 +842,15 @@ private fun DraggableIngredientRow(
                             onDrag = { _, change ->
                                 dragOffset += change
                                 
-                                // Simple reorder logic
-                                val threshold = 80f // Pixels to drag before reordering
+                                // Simple reorder logic with bounds checking
+                                val threshold = 60f // Pixels to drag before reordering (reduced for better responsiveness)
                                 
                                 when {
                                     dragOffset.y < -threshold && index > 0 -> {
                                         onReorder(index, index - 1)
                                         dragOffset = Offset.Zero
                                     }
-                                    dragOffset.y > threshold -> {
+                                    dragOffset.y > threshold && index < totalCount - 1 -> {
                                         onReorder(index, index + 1)
                                         dragOffset = Offset.Zero
                                     }
@@ -830,7 +880,13 @@ private fun DraggableIngredientRow(
 private fun DraggableInstructionRow(
     instruction: EditableInstruction,
     index: Int,
+    totalCount: Int,
     onReorder: (Int, Int) -> Unit,
+    onStartEditing: (String) -> Unit = {},
+    onTextChange: (String, String) -> Unit = { _, _ -> },
+    onSaveChanges: (String) -> Unit = {},
+    onCancelEditing: (String, String) -> Unit = { _, _ -> },
+    onDelete: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isDragging by remember { mutableStateOf(false) }
@@ -864,8 +920,8 @@ private fun DraggableInstructionRow(
                 // Drag handle
                 Icon(
                     imageVector = Icons.Default.Menu,
-                    contentDescription = "Drag to reorder",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    contentDescription = "Long press and drag to reorder",
+                    tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .padding(end = 8.dp)
                         .pointerInput(Unit) {
@@ -880,15 +936,15 @@ private fun DraggableInstructionRow(
                                                 onDrag = { _, change ->
                     dragOffset += change
                     
-                    // Simple reorder logic
-                    val threshold = 80f // Pixels to drag before reordering
+                    // Simple reorder logic with bounds checking
+                    val threshold = 60f // Pixels to drag before reordering (reduced for better responsiveness)
                     
                     when {
                         dragOffset.y < -threshold && index > 0 -> {
                             onReorder(index, index - 1)
                             dragOffset = Offset.Zero
                         }
-                        dragOffset.y > threshold -> {
+                        dragOffset.y > threshold && index < totalCount - 1 -> {
                             onReorder(index, index + 1)
                             dragOffset = Offset.Zero
                         }
@@ -905,11 +961,107 @@ private fun DraggableInstructionRow(
                     modifier = Modifier.padding(end = 8.dp)
                 )
                 
-                Text(
-                    text = instruction.text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f)
-                )
+                if (instruction.isEditing) {
+                    // Edit mode
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val originalText = remember { instruction.text }
+                        val keyboardController = LocalSoftwareKeyboardController.current
+                        
+                        OutlinedTextField(
+                            value = instruction.text,
+                            onValueChange = { newText ->
+                                onTextChange(instruction.id, newText)
+                            },
+                            label = { Text("Instruction") },
+                            placeholder = { Text("Enter cooking instruction...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    keyboardController?.hide()
+                                    onSaveChanges(instruction.id)
+                                }
+                            )
+                        )
+                        
+                        // Action buttons
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            // Delete button (for existing instructions)
+                            if (instruction.id.startsWith("inst_new_").not()) {
+                                OutlinedButton(
+                                    onClick = {
+                                        keyboardController?.hide()
+                                        onDelete(instruction.id)
+                                    },
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Delete")
+                                }
+                            }
+                            
+                            // Cancel button
+                            OutlinedButton(
+                                onClick = {
+                                    keyboardController?.hide()
+                                    onCancelEditing(instruction.id, originalText)
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Cancel")
+                            }
+                            
+                            // Save button  
+                            Button(
+                                onClick = {
+                                    keyboardController?.hide()
+                                    onSaveChanges(instruction.id)
+                                },
+                                enabled = instruction.text.trim().isNotEmpty()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Save")
+                            }
+                        }
+                    }
+                } else {
+                    // View mode
+                    Text(
+                        text = instruction.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                onStartEditing(instruction.id)
+                            }
+                    )
+                }
             }
         }
     }
