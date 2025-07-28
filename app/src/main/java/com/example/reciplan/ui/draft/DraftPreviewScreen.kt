@@ -29,6 +29,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -279,15 +280,25 @@ private fun EnhancedDraftToolbar(
     onApprove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val toolbarElevation by animateDpAsState(
-        targetValue = if (hasUnsavedChanges) 8.dp else 2.dp,
+    // Create a subtle gradient overlay for visual separation instead of harsh shadow
+    val headerAlpha by animateFloatAsState(
+        targetValue = if (hasUnsavedChanges) 0.05f else 0f,
         animationSpec = MotionSpecs.emphasizedTween(),
-        label = "toolbar_elevation"
+        label = "header_overlay_alpha"
     )
     
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        shadowElevation = toolbarElevation,
+        modifier = modifier
+            .fillMaxWidth()
+            .drawBehind {
+                if (headerAlpha > 0f) {
+                    drawRect(
+                        color = Color.Black.copy(alpha = headerAlpha),
+                        size = size.copy(height = size.height + 4.dp.toPx())
+                    )
+                }
+            },
+        shadowElevation = 0.dp, // Remove harsh shadow
         color = MaterialTheme.colorScheme.surface
     ) {
         TopAppBar(
@@ -405,7 +416,7 @@ private fun EnhancedTabRow(
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp
+        shadowElevation = 0.dp // Remove gray border
     ) {
                  TabRow(
              selectedTabIndex = selectedTabIndex,
@@ -448,8 +459,8 @@ private fun EnhancedOverviewTab(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.LargeShape,
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 4.dp
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                shadowElevation = 0.dp // Remove gray border for modern look
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
@@ -495,8 +506,8 @@ private fun EnhancedOverviewTab(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.LargeShape,
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 4.dp
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                shadowElevation = 0.dp // Remove gray border for modern look
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
@@ -829,8 +840,12 @@ private fun EnhancedEditableIngredientRow(
     Surface(
         modifier = modifier,
         shape = AppShapes.LargeShape,
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = if (ingredient.isEditing) 8.dp else 2.dp
+        color = if (ingredient.isEditing) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        shadowElevation = 0.dp // Remove gray borders for modern look
     ) {
         if (ingredient.isEditing) {
             // Edit mode using enhanced text fields
@@ -935,11 +950,11 @@ private fun EnhancedEditableIngredientRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Step number
+                // Step number with better contrast
                 Surface(
                     modifier = Modifier.size(32.dp),
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    color = MaterialTheme.colorScheme.primary
                 ) {
                     Box(
                         contentAlignment = Alignment.Center
@@ -948,7 +963,7 @@ private fun EnhancedEditableIngredientRow(
                             text = "${index + 1}",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }
@@ -1041,8 +1056,12 @@ private fun EnhancedEditableInstructionRow(
     Surface(
         modifier = modifier,
         shape = AppShapes.LargeShape,
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = if (instruction.isEditing) 8.dp else 2.dp
+        color = if (instruction.isEditing) {
+            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.1f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        shadowElevation = 0.dp // Remove gray borders for modern look
     ) {
         if (instruction.isEditing) {
             // Edit mode
@@ -1114,19 +1133,19 @@ private fun EnhancedEditableInstructionRow(
             }
         } else {
             // Display mode
-        Row(
-            modifier = Modifier
+            Row(
+                modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onStartEditing() }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Step number
+                // Step number with better contrast
                 Surface(
                     modifier = Modifier.size(32.dp),
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.secondaryContainer
+                    color = MaterialTheme.colorScheme.secondary
                 ) {
                     Box(
                         contentAlignment = Alignment.Center
@@ -1135,7 +1154,7 @@ private fun EnhancedEditableInstructionRow(
                             text = "${index + 1}",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                            color = MaterialTheme.colorScheme.onSecondary
                         )
                     }
                 }
@@ -1152,31 +1171,44 @@ private fun EnhancedEditableInstructionRow(
                     modifier = Modifier.weight(1f)
                 )
                 
-            // Drag handle
-            Icon(
-                imageVector = Icons.Default.Menu,
-                    contentDescription = "Drag to reorder",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                    .pointerInput(Unit) {
-                        detectDragGesturesAfterLongPress(
-                                onDragStart = { },
-                                onDragEnd = { },
-                                onDrag = { _, _ -> }
-                            )
-                        }
-                )
-                
-                // Delete button
-                IconButton(
-                    onClick = onDelete
+                // Action icons - properly aligned
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete instruction",
-                        tint = MaterialTheme.colorScheme.error
-                    )
+                    // Drag handle - now using IconButton for consistent sizing
+                    IconButton(
+                        onClick = { /* Drag functionality handled by gesture */ },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .pointerInput(Unit) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { },
+                                    onDragEnd = { },
+                                    onDrag = { _, _ -> }
+                                )
+                            }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Drag to reorder",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    
+                    // Delete button - consistent sizing
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete instruction",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -1400,7 +1432,7 @@ private fun EnhancedSaveConfirmationDialog(
         Surface(
             shape = AppShapes.LargeShape,
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 24.dp,
+            shadowElevation = 8.dp, // Reduce shadow for modern look
             modifier = Modifier
                 .scale(
                     animateFloatAsState(
@@ -1498,7 +1530,7 @@ private fun EnhancedDiscardConfirmationDialog(
         Surface(
             shape = AppShapes.LargeShape,
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 24.dp,
+            shadowElevation = 8.dp, // Reduce shadow for modern look
             modifier = Modifier
                 .scale(
                     animateFloatAsState(

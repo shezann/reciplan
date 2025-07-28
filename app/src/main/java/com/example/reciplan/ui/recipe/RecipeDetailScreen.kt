@@ -62,7 +62,6 @@ import com.example.reciplan.ui.theme.*
 fun RecipeDetailScreen(
     recipeId: String,
     onNavigateBack: () -> Unit,
-
     viewModelFactory: ViewModelProvider.Factory,
     modifier: Modifier = Modifier
 ) {
@@ -103,7 +102,7 @@ fun RecipeDetailScreen(
         } else if (selectedRecipe != null) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 80.dp) // Space for FAB
+                contentPadding = PaddingValues(bottom = 20.dp) // Reduced padding since FAB was removed
             ) {
                 item {
                     // Subtask 111: Enhanced Image Gallery
@@ -196,13 +195,13 @@ fun RecipeDetailScreen(
         
 
         
-        // Enhanced back button overlay
+        // Enhanced back button overlay with improved positioning
         EnhancedBackButton(
             onNavigateBack = onNavigateBack,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp)
-                .zIndex(10f)
+                .padding(20.dp)
+                .zIndex(15f) // Higher z-index to ensure it's on top
         )
     }
 }
@@ -248,12 +247,7 @@ private fun EnhancedImageGallery(
                                 .crossfade(true)
                                 .build(),
                     contentDescription = "Recipe image ${page + 1} for ${recipe.title}",
-                            modifier = Modifier
-                        .fillMaxSize()
-                        .clickable { 
-                            hapticFeedback.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                            onExpandToggle() 
-                        },
+                            modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
                             error = painterResource(R.drawable.ic_launcher_foreground),
                             placeholder = painterResource(R.drawable.ic_launcher_foreground)
@@ -298,21 +292,7 @@ private fun EnhancedImageGallery(
                 }
             }
             
-            // Expand/Collapse indicator
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp),
-                shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.6f)
-                            ) {
-                                Icon(
-                    imageVector = if (isExpanded) Icons.Default.Close else Icons.Default.Add,
-                    contentDescription = if (isExpanded) "Collapse image" else "Expand image",
-                    tint = Color.White,
-                    modifier = Modifier.padding(8.dp)
-                )
-            }
+            // Expand/Collapse indicator removed as requested
         }
     }
 }
@@ -506,7 +486,7 @@ private fun EnhancedIngredientsSection(
             }
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         
         // Progress bar
         if (ingredients.isNotEmpty()) {
@@ -515,13 +495,13 @@ private fun EnhancedIngredientsSection(
                 progress = { progress },
                             modifier = Modifier
                                 .fillMaxWidth()
-                    .height(6.dp)
+                    .height(4.dp)
                     .clip(AppShapes.SmallShape),
                 color = MaterialTheme.colorScheme.secondary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
         }
         
         // Ingredient List using IngredientRow components
@@ -531,7 +511,7 @@ private fun EnhancedIngredientsSection(
             color = MaterialTheme.colorScheme.surface
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(12.dp)
             ) {
                 ingredients.forEachIndexed { index, ingredient ->
                     val ingredientKey = "${ingredient.quantity} ${ingredient.name}"
@@ -749,7 +729,7 @@ private fun NutritionItem(
 
 
 /**
- * Enhanced Back Button with improved styling
+ * Enhanced Back Button with improved styling and better touch targets
  */
 @Composable
 private fun EnhancedBackButton(
@@ -757,16 +737,24 @@ private fun EnhancedBackButton(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier
+            .size(48.dp), // Ensure minimum touch target size
         shape = CircleShape,
         color = Color.Black.copy(alpha = 0.6f),
         shadowElevation = 4.dp
     ) {
-        IconButton(onClick = onNavigateBack) {
+        IconButton(
+            onClick = {
+                println("Back button clicked!") // Debug log
+                onNavigateBack()
+            },
+            modifier = Modifier.fillMaxSize()
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
-                tint = Color.White
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
             )
         }
     }
