@@ -24,12 +24,18 @@ class RecipeFeedPagingSource(
             val page = params.key ?: STARTING_PAGE_INDEX
             val pageSize = params.loadSize
             
+            println("🍴 RecipeFeedPagingSource: Loading page $page with size $pageSize")
+            
             // Call API with like fields included
             val response = recipeApi.getRecipeFeed(page, pageSize)
+            
+            println("🍴 RecipeFeedPagingSource: API response code: ${response.code()}")
             
             if (response.isSuccessful) {
                 val recipeFeedResponse = response.body()!!
                 val recipes = recipeFeedResponse.recipes
+                
+                println("🍴 RecipeFeedPagingSource: Successfully loaded ${recipes.size} recipes")
                 
                 // Performance optimization: pre-validate like fields and ensure data consistency
                 val validatedRecipes = recipes.map { recipe ->
@@ -46,16 +52,30 @@ class RecipeFeedPagingSource(
                     nextKey = if (recipes.isEmpty() || recipes.size < pageSize) null else page + 1
                 )
             } else {
+                val errorMessage = when (response.code()) {
+                    401 -> {
+                        println("🍴 RecipeFeedPagingSource: Authentication error (401) - tokens may not be ready")
+                        "Authentication required"
+                    }
+                    403 -> "Access denied"
+                    404 -> "Endpoint not found"
+                    500 -> "Server error"
+                    else -> "Network error (${response.code()})"
+                }
+                println("🍴 RecipeFeedPagingSource: Load failed with $errorMessage")
                 LoadResult.Error(HttpException(response))
             }
             
         } catch (exception: IOException) {
+            println("🍴 RecipeFeedPagingSource: Network/IO error: ${exception.message}")
             // Network error
             LoadResult.Error(exception)
         } catch (exception: HttpException) {
+            println("🍴 RecipeFeedPagingSource: HTTP error: ${exception.message}")
             // HTTP error
             LoadResult.Error(exception)
         } catch (exception: Exception) {
+            println("🍴 RecipeFeedPagingSource: Unexpected error: ${exception.message}")
             // Other errors
             LoadResult.Error(exception)
         }

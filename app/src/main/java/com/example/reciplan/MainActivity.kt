@@ -284,7 +284,9 @@ fun ReciplanApp() {
             RecipeDetailScreen(
                 recipeId = recipeId,
                 onNavigateBack = {
-                    navController.popBackStack()
+                    println("MainActivity: RecipeDetailScreen onNavigateBack called")
+                    val result = navController.popBackStack()
+                    println("MainActivity: navController.popBackStack() returned: $result")
                 },
                 viewModelFactory = viewModelFactory
             )

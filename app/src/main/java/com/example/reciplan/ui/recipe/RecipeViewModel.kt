@@ -39,7 +39,6 @@ class RecipeViewModel(
     
     init {
         loadCurrentUser()
-        loadRecipes()
         
         // Update filtered recipes when like states change
         viewModelScope.launch {
@@ -53,26 +52,40 @@ class RecipeViewModel(
     // Load current user data for filtering
     private fun loadCurrentUser() {
         viewModelScope.launch {
-            currentUser = authRepository.getCurrentUserData()
-            println("🔧 LOADED CURRENT USER: ${currentUser?.id} (${currentUser?.email})")
-            
-            // Refresh filtering after user data is loaded
-            updateFilteredRecipes()
+            try {
+                currentUser = authRepository.getCurrentUserData()
+                println("🔧 LOADED CURRENT USER: ${currentUser?.id} (${currentUser?.email})")
+                
+                // Only load recipes after user data is successfully loaded
+                loadRecipes()
+                
+                // Refresh filtering after user data is loaded
+                updateFilteredRecipes()
+            } catch (e: Exception) {
+                println("🔧 ERROR LOADING CURRENT USER: ${e.message}")
+                // Still try to load recipes even if user data fails (for unauthenticated access)
+                loadRecipes()
+            }
         }
     }
     
     // Load recipes from the feed
-    fun loadRecipes(refresh: Boolean = false) {
+    fun loadRecipes(refresh: Boolean = false, retryCount: Int = 0) {
         if (refresh) {
             currentPage = 1
             isLastPage = false
             _recipeFeed.value = emptyList()
         }
         if (_uiState.value.isLoading || isLastPage) return
+        
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
+            
+            println("🔧 LOADING RECIPES: page=$currentPage, refresh=$refresh, retryCount=$retryCount")
+            
             recipeRepository.getRecipeFeed(currentPage, 10).fold(
                 onSuccess = { response ->
+                    println("🔧 RECIPES LOADED SUCCESSFULLY: ${response.recipes.size} recipes")
                     val newRecipes = if (refresh) response.recipes else _recipeFeed.value + response.recipes
                     _recipeFeed.value = newRecipes
                     currentPage++
@@ -83,7 +96,34 @@ class RecipeViewModel(
                     updateFilteredRecipes()
                 },
                 onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = error.message)
+                    println("🔧 ERROR LOADING RECIPES: ${error.message}")
+                    
+                    // Auto-retry once for authentication errors (timing issues)
+                    val isAuthError = error.message?.contains("401") == true || 
+                                     error.message?.contains("Unauthorized") == true
+                    
+                    if (isAuthError && retryCount == 0) {
+                        println("🔧 AUTO-RETRYING due to auth error, waiting 1 second...")
+                        // Wait a moment for auth to settle, then retry
+                        kotlinx.coroutines.delay(1000)
+                        _uiState.value = _uiState.value.copy(isLoading = false)
+                        loadRecipes(refresh = refresh, retryCount = 1)
+                        return@fold
+                    }
+                    
+                    val errorMessage = when {
+                        isAuthError -> {
+                            "Authentication required. Please log in again."
+                        }
+                        error.message?.contains("Network") == true || error.message?.contains("IOException") == true -> {
+                            "Network error. Please check your connection and try again."
+                        }
+                        error.message?.contains("Server Error") == true || error.message?.contains("500") == true -> {
+                            "Server error. Please try again in a moment."
+                        }
+                        else -> error.message ?: "Failed to load recipes. Please try again."
+                    }
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = errorMessage)
                 }
             )
         }

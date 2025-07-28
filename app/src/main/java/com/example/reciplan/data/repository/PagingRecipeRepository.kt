@@ -14,11 +14,14 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 /**
  * Repository that provides recipe feed data using Paging 3
  * Integrates with LikeRepository to provide real-time like state updates
+ * Uses simplified loading with retry logic handled by UI layer
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class PagingRecipeRepository(
     private val recipeApi: RecipeApi,
     private val likeRepository: LikeRepository,
@@ -32,7 +35,7 @@ class PagingRecipeRepository(
     // Keep reference to current paging source for invalidation
     private var currentPagingSource: RecipeFeedPagingSource? = null
     
-    // Create the pager once as a lazy property
+    // Create the pager once as a lazy property - simplified approach
     private val pager by lazy {
         Pager(
             config = PagingConfig(
@@ -48,7 +51,7 @@ class PagingRecipeRepository(
             }
         )
     }
-    
+
     // Share the pager flow to prevent multiple collections
     private val sharedPagerFlow by lazy {
         pager.flow
@@ -59,8 +62,8 @@ class PagingRecipeRepository(
                 replay = 1
             )
     }
-    
-    // Create the combined flow once as a lazy property
+
+    // Create the combined flow with like states - back to simple approach
     private val recipeFeedFlow by lazy {
         combine(
             sharedPagerFlow,

@@ -35,7 +35,7 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
 import com.example.reciplan.data.model.Recipe
 import com.example.reciplan.data.repository.LikeState
-import com.example.reciplan.ui.components.EmptyState
+import com.example.reciplan.ui.components.*
 import com.example.reciplan.ui.components.EmptyStateType
 import com.example.reciplan.ui.recipe.RecipeCard
 import com.example.reciplan.ui.theme.*
@@ -70,9 +70,47 @@ fun HomeScreen(
     var isInitialLoad by remember { mutableStateOf(true) }
     val pullToRefreshState = rememberPullToRefreshState()
     
+    // Startup state management
+    var hasStartupCompleted by remember { mutableStateOf(false) }
+    var startupRetryCount by remember { mutableStateOf(0) }
+    
+    // Handle startup timing with automatic retry for auth issues
     LaunchedEffect(recipeFeed.loadState.refresh) {
+        val refreshState = recipeFeed.loadState.refresh
+        
+        // Give a brief moment for authentication to settle on first launch
+        if (!hasStartupCompleted && refreshState is LoadState.Loading) {
+            println("🏠 HomeScreen: Initial load detected, giving auth time to settle...")
+            kotlinx.coroutines.delay(1500) // Give auth extra time on startup
+            hasStartupCompleted = true
+        }
+        
+        // Handle authentication errors with progressive retry
+        if (refreshState is LoadState.Error && recipeFeed.itemCount == 0) {
+            val error = refreshState.error
+            val isAuthError = error.message?.contains("401") == true ||
+                             error.message?.contains("Unauthorized") == true ||
+                             error.message?.contains("Authentication") == true
+            
+            if (isAuthError && startupRetryCount < 3) {
+                val retryDelay = when (startupRetryCount) {
+                    0 -> 1000L  // 1 second for first retry
+                    1 -> 2000L  // 2 seconds for second retry  
+                    else -> 3000L // 3 seconds for third retry
+                }
+                
+                println("🏠 HomeScreen: Auth error detected (attempt ${startupRetryCount + 1}), retrying in ${retryDelay}ms...")
+                startupRetryCount++
+                kotlinx.coroutines.delay(retryDelay)
+                recipeFeed.retry()
+                println("🏠 HomeScreen: Retry executed (attempt $startupRetryCount)")
+            }
+        }
+        
+        // Reset states when loading is successful
         if (recipeFeed.loadState.refresh is LoadState.NotLoading && recipeFeed.itemCount > 0) {
             isInitialLoad = false
+            startupRetryCount = 0 // Reset retry count on success
         }
     }
     
@@ -150,6 +188,7 @@ fun HomeScreen(
                     onRecipeClick = onRecipeClick,
                     listState = listState,
                     isInitialLoad = isInitialLoad,
+                    startupRetryCount = startupRetryCount,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -297,6 +336,7 @@ private fun EnhancedRecipeFeedContent(
     onRecipeClick: (String) -> Unit,
     listState: LazyListState,
     isInitialLoad: Boolean,
+    startupRetryCount: Int,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -388,15 +428,42 @@ private fun EnhancedRecipeFeedContent(
             }
             is LoadState.Error -> {
                 if (recipeFeed.itemCount == 0) {
+                    val error = recipeFeed.loadState.refresh as LoadState.Error
+                    val isAuthError = error.error.message?.contains("401") == true ||
+                                     error.error.message?.contains("Unauthorized") == true ||
+                                     error.error.message?.contains("Authentication") == true
+                    
+                    // Show friendly loading state if we're still in startup retry phase
+                    val isStartupPhase = startupRetryCount > 0 && startupRetryCount < 3
+                    
                     item {
-                        // Subtask 103: Empty State Integration (Error case)
-                        EmptyState(
-                            type = EmptyStateType.CONNECTION_ERROR,
-                            onPrimaryAction = { recipeFeed.retry() },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp)
-                        )
+                        if (isAuthError && isStartupPhase) {
+                            // Show a more user-friendly loading state for auth errors during startup
+                            println("🏠 HomeScreen: Auth error during startup retry, showing loading state")
+                            EnhancedInitialLoadingState(
+                                message = "Setting up your recipes..."
+                            )
+                        } else if (isAuthError) {
+                            // After multiple retries, show a more specific auth error
+                            println("🏠 HomeScreen: Auth error after retries, showing auth-specific error")
+                            EmptyState(
+                                type = EmptyStateType.CONNECTION_ERROR,
+                                onPrimaryAction = { recipeFeed.retry() },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp)
+                            )
+                        } else {
+                            // Show connection error for actual network issues
+                            println("🏠 HomeScreen: Network error, showing connection error")
+                            EmptyState(
+                                type = EmptyStateType.CONNECTION_ERROR,
+                                onPrimaryAction = { recipeFeed.retry() },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -534,7 +601,8 @@ private fun EnhancedPaginationErrorItem(
  */
 @Composable
 private fun EnhancedInitialLoadingState(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    message: String = "Loading recipes..."
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "initial_loading")
     
@@ -575,7 +643,7 @@ private fun EnhancedInitialLoadingState(
             }
             
             Text(
-                text = "Loading delicious recipes...",
+                text = message,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium
