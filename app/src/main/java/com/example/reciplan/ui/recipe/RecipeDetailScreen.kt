@@ -86,18 +86,18 @@ fun RecipeDetailScreen(
     val performNavigation = remember {
         {
             if (!isNavigating) {
-                println("Navigation triggered - starting navigation")
+        
                 isNavigating = true
                 try {
                     onNavigateBack()
-                    println("onNavigateBack() call completed successfully")
+
                 } catch (e: Exception) {
-                    println("Error in onNavigateBack(): ${e.message}")
+
                     // Reset navigation state on error so user can try again
                     isNavigating = false
                 }
             } else {
-                println("Navigation triggered - already in progress, ignoring")
+
             }
         }
     }
@@ -107,7 +107,7 @@ fun RecipeDetailScreen(
         if (isNavigating) {
             kotlinx.coroutines.delay(3000) // 3 second timeout
             if (isNavigating) {
-                println("Navigation timeout - resetting navigation state")
+    
                 isNavigating = false
             }
         }
@@ -127,7 +127,7 @@ fun RecipeDetailScreen(
     
     // Handle system back button with same debouncing protection
     BackHandler {
-        println("System back button pressed")
+
         performNavigation()
     }
     
@@ -257,7 +257,7 @@ fun RecipeDetailScreen(
         if (uiState.error != null) { // Only show when there's an error to avoid cluttering
             Surface(
                 onClick = {
-                    println("DEBUG: Touch area verification - back button area is responsive")
+        
                 },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -912,11 +912,11 @@ private fun EnhancedBackButton(
     val handleClick = remember(onNavigateBack) {
         {
             if (!isNavigating) {
-                println("🔙 Enhanced back button clicked - performing navigation")
+    
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 onNavigateBack()
             } else {
-                println("🔙 Enhanced back button clicked - navigation already in progress, ignoring")
+
             }
         }
     }

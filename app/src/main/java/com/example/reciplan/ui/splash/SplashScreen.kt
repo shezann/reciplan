@@ -104,31 +104,29 @@ private fun handleAuthNavigation(
     when (authState) {
         is AuthResult.Success -> {
             val successState = authState as AuthResult.Success
-            println("SplashScreen: Navigation check - User ID: ${successState.user.id}")
-            println("SplashScreen: Navigation check - Username: ${successState.user.username}")
-            println("SplashScreen: Navigation check - Setup complete: ${successState.user.setup_complete}")
+            
             
             // Check if user has completed setup (has username and setup_complete)
             if (successState.user.username != null && successState.user.setup_complete) {
-                println("SplashScreen: Navigating to main screen")
+
                 onNavigateToMain()
             } else if (successState.user.username != null && !successState.user.setup_complete) {
                 // User has a username but setup_complete is false - this might be a data inconsistency
                 // Navigate to main screen anyway since they have a username
-                println("SplashScreen: User has username but setup_complete is false, navigating to main anyway")
+
                 onNavigateToMain()
             } else {
-                println("SplashScreen: Navigating to username setup screen")
+
                 // User needs to set up username
                 onNavigateToUsername()
             }
         }
         is AuthResult.Error -> {
-            println("SplashScreen: Auth error - ${authState.message}, navigating to auth")
+
             onNavigateToAuth()
         }
         is AuthResult.Loading -> {
-            println("SplashScreen: Auth loading, staying on splash")
+
             // Stay on splash screen
         }
     }

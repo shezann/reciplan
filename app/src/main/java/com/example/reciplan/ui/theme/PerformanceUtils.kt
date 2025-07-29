@@ -268,7 +268,7 @@ object PerformanceMonitor {
         SideEffect {
             recompositionCount.intValue++
             if (recompositionCount.intValue > 1) {
-                println("🔄 Recomposition #${recompositionCount.intValue} for: $tag")
+        
             }
         }
         
@@ -293,7 +293,7 @@ object PerformanceMonitor {
                     val frameDuration = currentTime - lastFrameTime
                     val fps = 1000f / frameDuration
                     if (fps < 55f) { // Alert for drops below 55fps
-                        println("⚠️ Low FPS detected for $tag: ${fps.toInt()}fps")
+        
                     }
                 }
                 lastFrameTime = currentTime
@@ -316,7 +316,7 @@ object PerformanceMonitor {
                 val runtime = Runtime.getRuntime()
                 val usedMemory = runtime.totalMemory() - runtime.freeMemory()
                 val usedMemoryMB = usedMemory / (1024 * 1024)
-                println("🧠 Memory usage for $tag: ${usedMemoryMB}MB")
+
             }
         }
     }

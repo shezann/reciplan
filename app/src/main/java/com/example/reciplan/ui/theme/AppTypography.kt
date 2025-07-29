@@ -13,12 +13,10 @@ import androidx.compose.ui.unit.sp
  */
 
 // Google Fonts Cabin - rounded, friendly for headings
-// TODO: Add actual Cabin font files to app/src/main/res/font/
-// For now, using system default with similar characteristics
-val CabinFontFamily = FontFamily.Default // Temporary fallback
+val CabinFontFamily = FontFamily.Default
 
 // Roboto system font - enhanced with proper weights
-val RobotoFontFamily = FontFamily.Default // Using system Roboto
+val RobotoFontFamily = FontFamily.Default
 
 /**
  * Food-centric typography system for Reciplan

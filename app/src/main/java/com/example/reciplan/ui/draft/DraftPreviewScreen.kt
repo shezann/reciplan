@@ -1178,7 +1178,7 @@ private fun EnhancedEditableInstructionRow(
                 ) {
                     // Drag handle - now using IconButton for consistent sizing
                     IconButton(
-                        onClick = { /* Drag functionality handled by gesture */ },
+                        onClick = { },
                         modifier = Modifier
                             .size(40.dp)
                             .pointerInput(Unit) {

@@ -37,10 +37,10 @@ class AuthViewModel(
                             val userWithSetupFlag = userData.copy(
                                 setup_complete = !userData.username.isNullOrBlank()
                             )
-                            println("AuthViewModel: User data retrieved - username: ${userData.username}, setup_complete: ${userWithSetupFlag.setup_complete}")
+            
                             _authState.value = AuthResult.Success(userWithSetupFlag)
                         } else {
-                            println("AuthViewModel: Backend data not available, this shouldn't happen if authenticated")
+
                             // If we're authenticated but can't get user data, there's a problem
                             // Sign out and let the user re-authenticate
                             authRepository.signOut()

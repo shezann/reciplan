@@ -37,9 +37,9 @@ fun ChooseUsernameScreen(
         val currentAuthState = authState
         if (currentAuthState is com.example.reciplan.data.auth.AuthResult.Success) {
             val user = currentAuthState.user
-            println("ChooseUsernameScreen: Checking existing username - User: ${user.username}")
+    
             if (!user.username.isNullOrBlank()) {
-                println("ChooseUsernameScreen: User already has username: ${user.username}")
+                
                 userAlreadyHasUsername = true
                 existingUsername = user.username
             } else {
@@ -132,19 +132,7 @@ fun ChooseUsernameScreen(
                 Text("Continue to App")
             }
 
-            // Debug button to clear authentication state
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(
-                onClick = { 
-                    println("ChooseUsernameScreen: Debug - Clearing authentication state")
-                    viewModel.signOut()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Clear Auth & Start Fresh")
-            }
 
-            // Debug information
             Spacer(modifier = Modifier.height(16.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -376,67 +364,7 @@ fun ChooseUsernameScreen(
                 }
             }
 
-            // Debug information for normal username setup
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "🐛 Debug Info - Why am I here?",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    
-                    val currentAuthState = authState
-                    if (currentAuthState is com.example.reciplan.data.auth.AuthResult.Success) {
-                        Text(
-                            text = "User ID: ${currentAuthState.user.id}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Text(
-                            text = "Email: ${currentAuthState.user.email}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Text(
-                            text = "Username: ${currentAuthState.user.username ?: "⚠️ NULL/EMPTY"}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Text(
-                            text = "Setup Complete: ${currentAuthState.user.setup_complete}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    } else {
-                        Text(
-                            text = "Auth State: ${currentAuthState::class.simpleName}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
-            }
 
-            // Debug button to clear authentication state
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(
-                onClick = { 
-                    println("ChooseUsernameScreen: Debug - Clearing authentication state")
-                    viewModel.signOut()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Clear Auth & Start Fresh")
-            }
         }
     }
 } 

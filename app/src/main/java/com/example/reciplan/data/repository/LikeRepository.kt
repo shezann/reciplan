@@ -267,7 +267,7 @@ class LikeRepository(
                     when (response.code()) {
                         400, 403, 404, 409 -> return Result.failure(error)
                         401 -> {
-                            // TODO: Trigger token refresh
+            
                             return Result.failure(Exception("Authentication required"))
                         }
                         429 -> {

@@ -23,8 +23,8 @@ import com.example.reciplan.ui.auth.LoginScreen
 import com.example.reciplan.ui.recipe.CreateRecipeScreen
 import com.example.reciplan.ui.recipe.EditRecipeScreen
 import com.example.reciplan.ui.recipe.RecipeDetailScreen
-import com.example.reciplan.ui.recipe.RecipeScreenDevelopment
-import com.example.reciplan.ui.recipe.RecipeScreenDebug
+
+
 import com.example.reciplan.ui.main.MainScreen
 import com.example.reciplan.ui.splash.SplashScreen
 import com.example.reciplan.ui.draft.DraftPreviewScreen
@@ -284,9 +284,9 @@ fun ReciplanApp() {
             RecipeDetailScreen(
                 recipeId = recipeId,
                 onNavigateBack = {
-                    println("MainActivity: RecipeDetailScreen onNavigateBack called")
+            
                     val result = navController.popBackStack()
-                    println("MainActivity: navController.popBackStack() returned: $result")
+                    
                 },
                 viewModelFactory = viewModelFactory
             )

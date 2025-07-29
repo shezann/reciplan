@@ -17,32 +17,31 @@ class RecipeRepository(
     // Get recipe feed with pagination
     suspend fun getRecipeFeed(page: Int = 1, limit: Int = 10): Result<RecipeFeedResponse> {
         return try {
-            println("RecipeRepository: Getting recipe feed - page: $page, limit: $limit")
+    
             
             val response = recipeApi.getRecipeFeed(page, limit)
-            println("RecipeRepository: Feed response code: ${response.code()}")
-            println("RecipeRepository: Feed response headers: ${response.headers()}")
+
             
             if (response.isSuccessful) {
                 val body = response.body()
-                println("RecipeRepository: Feed response body: $body")
+
                 if (body != null) {
-                    println("RecipeRepository: Feed returned ${body.recipes.size} recipes")
+
                     body.recipes.forEach { recipe ->
-                        println("RecipeRepository: Recipe - ID: ${recipe.id}, Title: ${recipe.title}, UserID: ${recipe.userId}")
+
                     }
                     Result.success(body)
                 } else {
-                    println("RecipeRepository: Empty response body despite successful feed response")
+
                     Result.failure(Exception("Empty response body"))
                 }
             } else {
                 val errorBody = response.errorBody()?.string()
-                println("RecipeRepository: Feed error response body: $errorBody")
+
                 Result.failure(handleError(response))
             }
         } catch (e: Exception) {
-            println("RecipeRepository: Exception getting recipe feed: ${e.message}")
+
             e.printStackTrace()
             Result.failure(e)
         }

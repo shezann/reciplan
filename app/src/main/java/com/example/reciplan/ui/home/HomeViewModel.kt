@@ -157,7 +157,7 @@ class HomeViewModel(
      */
     fun searchRecipes(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
-        // TODO: Implement search functionality with paging
+
         // For now, we'll just update the state
     }
 
@@ -166,7 +166,7 @@ class HomeViewModel(
      */
     fun filterRecipesByTag(tag: String) {
         _uiState.value = _uiState.value.copy(selectedFilter = tag)
-        // TODO: Implement filter functionality with paging
+
         // For now, we'll just update the state
     }
 

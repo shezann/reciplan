@@ -54,7 +54,7 @@ class RecipeViewModel(
         viewModelScope.launch {
             try {
                 currentUser = authRepository.getCurrentUserData()
-                println("🔧 LOADED CURRENT USER: ${currentUser?.id} (${currentUser?.email})")
+        
                 
                 // Only load recipes after user data is successfully loaded
                 loadRecipes()
@@ -62,7 +62,7 @@ class RecipeViewModel(
                 // Refresh filtering after user data is loaded
                 updateFilteredRecipes()
             } catch (e: Exception) {
-                println("🔧 ERROR LOADING CURRENT USER: ${e.message}")
+    
                 // Still try to load recipes even if user data fails (for unauthenticated access)
                 loadRecipes()
             }
@@ -81,11 +81,11 @@ class RecipeViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             
-            println("🔧 LOADING RECIPES: page=$currentPage, refresh=$refresh, retryCount=$retryCount")
+    
             
             recipeRepository.getRecipeFeed(currentPage, 10).fold(
                 onSuccess = { response ->
-                    println("🔧 RECIPES LOADED SUCCESSFULLY: ${response.recipes.size} recipes")
+    
                     val newRecipes = if (refresh) response.recipes else _recipeFeed.value + response.recipes
                     _recipeFeed.value = newRecipes
                     currentPage++
@@ -96,14 +96,14 @@ class RecipeViewModel(
                     updateFilteredRecipes()
                 },
                 onFailure = { error ->
-                    println("🔧 ERROR LOADING RECIPES: ${error.message}")
+
                     
                     // Auto-retry once for authentication errors (timing issues)
                     val isAuthError = error.message?.contains("401") == true || 
                                      error.message?.contains("Unauthorized") == true
                     
                     if (isAuthError && retryCount == 0) {
-                        println("🔧 AUTO-RETRYING due to auth error, waiting 1 second...")
+    
                         // Wait a moment for auth to settle, then retry
                         kotlinx.coroutines.delay(1000)
                         _uiState.value = _uiState.value.copy(isLoading = false)
@@ -171,13 +171,13 @@ class RecipeViewModel(
         val currentLikeState = likeRepository.likeStates.value[recipe.id]
         val isCurrentlyLiked = currentLikeState?.liked ?: recipe.liked // Fallback to API field if no live state
         
-        // Debug logging for "All" filter (key debugging only)
+        
         if (state.selectedFilter == "All" || state.selectedFilter.isEmpty()) {
             // Special debugging for the problematic recipe only
             if (recipe.id == "fcd08e90-8cf6-4a8f-a0de-11b1484d6f57") {
                 val isCreatedByUser = recipe.userId == currentUserId
                 val shouldShow = isCreatedByUser || isCurrentlyLiked
-                println("🚨 PROBLEMATIC RECIPE - Should show: $shouldShow (created: $isCreatedByUser, liked: $isCurrentlyLiked)")
+
             }
         }
         
@@ -190,12 +190,7 @@ class RecipeViewModel(
                 
                 // Extra debug for problematic recipe
                 if (recipe.id == "fcd08e90-8cf6-4a8f-a0de-11b1484d6f57") {
-                    println("🚨 FILTER MATCH CALCULATION:")
-                    println("  currentUserId.isNullOrEmpty(): ${currentUserId.isNullOrEmpty()}")
-                    println("  recipe.userId.isEmpty(): ${recipe.userId.isEmpty()}")
-                    println("  isCreated: $isCreated")
-                    println("  isCurrentlyLiked: $isCurrentlyLiked")
-                    println("  Final result: $result")
+                    
                 }
                 
                 result
@@ -204,9 +199,9 @@ class RecipeViewModel(
                 // Show ONLY created recipes
                 val result = !currentUserId.isNullOrEmpty() && recipe.userId.isNotEmpty() && recipe.userId == currentUserId
                 
-                // Debug logging for My Recipes filter
+
                 if (!result) {
-                    println("📝 MY RECIPES - FILTERED OUT: '${recipe.title}' (owner: '${recipe.userId}', you: '$currentUserId')")
+    
                 }
                 
                 result
@@ -223,12 +218,12 @@ class RecipeViewModel(
     // Helper to update filteredRecipes after any change
     private fun updateFilteredRecipes() {
         val state = _uiState.value
-        println("🔧 FILTERING: '${state.selectedFilter}' → ${_recipeFeed.value.size} recipes")
+
         
         // Always apply filtering logic (including "All" for personalized feed)
         val newFiltered = _recipeFeed.value.filter { recipeMatchesCurrentFilter(it) }
         
-        println("🔧 RESULT: ${newFiltered.size} recipes shown: ${newFiltered.map { it.title }}")
+
         
         _uiState.value = state.copy(filteredRecipes = newFiltered)
     }
@@ -239,8 +234,7 @@ class RecipeViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true)
             recipeRepository.createRecipe(request).fold(
                 onSuccess = { recipe ->
-                    println("🔧 RECIPE CREATED: '${recipe.title}' (ID: ${recipe.id}, UserID: ${recipe.userId})")
-                    println("🔧 CURRENT USER: ${getCurrentUserId()}")
+                    
                     
                     // Force refresh from server to ensure we get the latest data
                     loadRecipes(refresh = true)
@@ -344,7 +338,7 @@ class RecipeViewModel(
     
     // Filter recipes by tags
     fun filterRecipesByTag(tag: String) {
-        println("🎯 FILTER BY TAG CALLED: '$tag'")
+
         
         // Update the selected filter first
         _uiState.value = _uiState.value.copy(selectedFilter = tag)
@@ -355,7 +349,7 @@ class RecipeViewModel(
     
     // Search recipes
     fun searchRecipes(query: String) {
-        println("🔍 SEARCH RECIPES CALLED: '$query'")
+
         
         // Update the search query first
         _uiState.value = _uiState.value.copy(searchQuery = query)
@@ -396,18 +390,18 @@ class RecipeViewModel(
     // Toggle like status for a recipe
     fun toggleLike(recipeId: String, currentlyLiked: Boolean) {
         viewModelScope.launch {
-            println("🔧 RECIPE SCREEN - TOGGLE LIKE: $recipeId, currently: $currentlyLiked")
+    
             
             val result = likeRepository.toggleLike(recipeId, currentlyLiked)
             result.fold(
                 onSuccess = { likeResponse ->
-                    println("🔧 RECIPE SCREEN - LIKE SUCCESS: ${likeResponse.liked}, count: ${likeResponse.likesCount}")
+    
                     // The real-time like state will automatically update via StateFlow
                     // Refresh filtered recipes to ensure consistency
                     updateFilteredRecipes()
                 },
                 onFailure = { error ->
-                    println("🔧 RECIPE SCREEN - LIKE ERROR: ${error.message}")
+
                     _uiState.value = _uiState.value.copy(error = "Failed to ${if (currentlyLiked) "unlike" else "like"} recipe: ${error.message}")
                 }
             )

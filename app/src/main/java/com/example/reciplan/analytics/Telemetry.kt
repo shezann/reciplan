@@ -22,7 +22,7 @@ object Telemetry {
         )
         
         logEvent("ingest_started", event)
-        // TODO: Send to actual analytics service (Firebase, Mixpanel, etc.)
+
     }
     
     /**
@@ -37,7 +37,6 @@ object Telemetry {
         )
         
         logEvent("ingest_failed", event)
-        // TODO: Send to actual analytics service
     }
     
     /**
@@ -52,7 +51,6 @@ object Telemetry {
         )
         
         logEvent("ingest_succeeded", event)
-        // TODO: Send to actual analytics service
     }
     
     /**
@@ -66,7 +64,6 @@ object Telemetry {
         )
         
         logEvent("ingest_cancelled", event)
-        // TODO: Send to actual analytics service
     }
     
     /**
@@ -81,7 +78,6 @@ object Telemetry {
         )
         
         logEvent("ingest_retried", event)
-        // TODO: Send to actual analytics service
     }
     
     /**

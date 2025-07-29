@@ -492,53 +492,7 @@ fun RecipeScreen(
     }
 }
 
-// Development helper - you can remove this in production
-@Composable
-fun RecipeScreenDevelopment(
-    onNavigateToCreateRecipe: () -> Unit,
-    onNavigateToRecipeDetail: (String) -> Unit,
-    onNavigateToEditRecipe: (String) -> Unit,
-    onNavigateToAddFromTikTok: () -> Unit = {},
-    viewModelFactory: ViewModelProvider.Factory,
-    showCreateButton: Boolean = true,
-    modifier: Modifier = Modifier
-) {
-    val viewModel: RecipeViewModel = viewModel(factory = viewModelFactory)
-    
-    Column(
-        modifier = modifier.fillMaxSize()
-    ) {
-        // Development Tools
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.secondaryContainer
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(
-                    onClick = { viewModel.seedRecipes() }
-                ) {
-                    Text("Seed Recipes")
-                }
-            }
-        }
-        
-        // Main Recipe Screen
-        RecipeScreen(
-            onNavigateToCreateRecipe = onNavigateToCreateRecipe,
-            onNavigateToRecipeDetail = onNavigateToRecipeDetail,
-            onNavigateToEditRecipe = onNavigateToEditRecipe,
-            onNavigateToAddFromTikTok = onNavigateToAddFromTikTok,
-            viewModelFactory = viewModelFactory,
-            showCreateButton = showCreateButton,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
+
 
 /**
  * Enhanced initial loading state with emoji animation from HomeScreen

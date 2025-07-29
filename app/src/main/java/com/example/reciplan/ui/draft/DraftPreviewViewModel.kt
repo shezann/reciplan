@@ -310,18 +310,18 @@ class DraftPreviewViewModel(
     }
     
     private fun parseIngredientsFromJson(element: JsonElement?): List<Ingredient> {
-        // TODO: Implement JSON parsing for ingredients array
+        
         // For now return empty list - will be populated from ingredient_candidates
         return emptyList()
     }
     
     private fun parseInstructionsFromJson(element: JsonElement?): List<String> {
-        // TODO: Implement JSON parsing for instructions array
+        
         return emptyList()
     }
     
     private fun parseTagsFromJson(element: JsonElement?): List<String> {
-        // TODO: Implement JSON parsing for tags array
+        
         return emptyList()
     }
     

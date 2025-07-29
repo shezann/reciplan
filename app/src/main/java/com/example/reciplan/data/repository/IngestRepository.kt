@@ -17,30 +17,30 @@ class IngestRepository(
      */
     suspend fun startIngest(url: String): Result<StartIngestResponse> {
         return try {
-            println("IngestRepository: Starting ingest for URL: $url")
+    
             
             val request = StartIngestRequest(url = url)
             val response = ingestApi.startIngest(request)
             
-            println("IngestRepository: Start ingest response code: ${response.code()}")
+
             
             if (response.isSuccessful) {
                 val body = response.body()
-                println("IngestRepository: Start ingest response body: $body")
+
                 if (body != null) {
-                    println("IngestRepository: Started ingest job with ID: ${body.jobId}")
+
                     Result.success(body)
                 } else {
-                    println("IngestRepository: Empty response body despite successful start ingest response")
+
                     Result.failure(Exception("Empty response body"))
                 }
             } else {
                 val errorBody = response.errorBody()?.string()
-                println("IngestRepository: Start ingest error response body: $errorBody")
+
                 Result.failure(handleError(response))
             }
         } catch (e: Exception) {
-            println("IngestRepository: Exception starting ingest: ${e.message}")
+
             e.printStackTrace()
             Result.failure(e)
         }
@@ -53,29 +53,29 @@ class IngestRepository(
      */
     suspend fun pollJob(jobId: String): Result<IngestJobDto> {
         return try {
-            println("IngestRepository: Polling job with ID: $jobId")
+    
             
             val response = ingestApi.pollJob(jobId)
             
-            println("IngestRepository: Poll job response code: ${response.code()}")
+
             
             if (response.isSuccessful) {
                 val body = response.body()
-                println("IngestRepository: Poll job response body: $body")
+
                 if (body != null) {
-                    println("IngestRepository: Job status: ${body.status}, Recipe ID: ${body.recipeId}")
+
                     Result.success(body)
                 } else {
-                    println("IngestRepository: Empty response body despite successful poll job response")
+
                     Result.failure(Exception("Empty response body"))
                 }
             } else {
                 val errorBody = response.errorBody()?.string()
-                println("IngestRepository: Poll job error response body: $errorBody")
+
                 Result.failure(handleError(response))
             }
         } catch (e: Exception) {
-            println("IngestRepository: Exception polling job: ${e.message}")
+
             e.printStackTrace()
             Result.failure(e)
         }
@@ -105,15 +105,15 @@ class IngestRepository(
      */
     suspend fun getActiveJobs(): Result<List<IngestJobDto>> {
         return try {
-            println("IngestRepository: Getting active jobs")
+    
             
             val response = ingestApi.getActiveJobs()
             
-            println("IngestRepository: Get active jobs response code: ${response.code()}")
+
             
             if (response.isSuccessful) {
                 val body = response.body()
-                println("IngestRepository: Get active jobs response body: $body")
+
                 if (body != null) {
                     val activeJobs = body.filter { job ->
                         // Consider jobs as active if they're not in terminal states
@@ -122,19 +122,19 @@ class IngestRepository(
                             IngestStatus.FAILED
                         )
                     }
-                    println("IngestRepository: Found ${activeJobs.size} active jobs")
+
                     Result.success(activeJobs)
                 } else {
-                    println("IngestRepository: Empty response body despite successful get active jobs response")
+
                     Result.success(emptyList())
                 }
             } else {
                 val errorBody = response.errorBody()?.string()
-                println("IngestRepository: Get active jobs error response body: $errorBody")
+
                 Result.failure(handleError(response))
             }
         } catch (e: Exception) {
-            println("IngestRepository: Exception getting active jobs: ${e.message}")
+
             e.printStackTrace()
             Result.failure(e)
         }

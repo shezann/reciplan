@@ -48,12 +48,12 @@ class ProfileViewModel(
             _errorMessage.value = null
             
             try {
-                println("ProfileViewModel: Loading user recipes...")
+        
                 val result = recipeRepository.getMyRecipes(page = 1, limit = 50)
                 
                 result.fold(
                     onSuccess = { response ->
-                        println("ProfileViewModel: Successfully loaded ${response.recipes.size} user recipes")
+    
                         _userRecipes.value = response.recipes
                         
                         // Initialize like states for these recipes
@@ -62,13 +62,13 @@ class ProfileViewModel(
                         }
                     },
                     onFailure = { error ->
-                        println("ProfileViewModel: Error loading user recipes: ${error.message}")
+
                         _errorMessage.value = "Failed to load your recipes: ${error.message}"
                         _userRecipes.value = emptyList()
                     }
                 )
             } catch (e: Exception) {
-                println("ProfileViewModel: Exception loading user recipes: ${e.message}")
+                
                 _errorMessage.value = "Failed to load your recipes: ${e.message}"
                 _userRecipes.value = emptyList()
             } finally {
@@ -83,7 +83,7 @@ class ProfileViewModel(
     fun toggleLike(recipeId: String, currentlyLiked: Boolean) {
         viewModelScope.launch {
             try {
-                println("ProfileViewModel: Toggling like for recipe $recipeId, currently liked: $currentlyLiked")
+        
                 
                 likeRepository.toggleLike(recipeId, currentlyLiked)
                 
@@ -101,7 +101,7 @@ class ProfileViewModel(
                 _userRecipes.value = updatedRecipes
                 
             } catch (e: Exception) {
-                println("ProfileViewModel: Error toggling like: ${e.message}")
+                
                 _errorMessage.value = "Failed to update like: ${e.message}"
             }
         }

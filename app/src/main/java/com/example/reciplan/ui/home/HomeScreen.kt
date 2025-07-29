@@ -89,7 +89,7 @@ fun HomeScreen(
         
         // Give a brief moment for authentication to settle on first launch
         if (!hasStartupCompleted && refreshState is LoadState.Loading) {
-            println("🏠 HomeScreen: Initial load detected, giving auth time to settle...")
+
             kotlinx.coroutines.delay(1500) // Give auth extra time on startup
             hasStartupCompleted = true
         }
@@ -108,11 +108,11 @@ fun HomeScreen(
                     else -> 3000L // 3 seconds for third retry
                 }
                 
-                println("🏠 HomeScreen: Auth error detected (attempt ${startupRetryCount + 1}), retrying in ${retryDelay}ms...")
+
                 startupRetryCount++
                 kotlinx.coroutines.delay(retryDelay)
                 recipeFeed.retry()
-                println("🏠 HomeScreen: Retry executed (attempt $startupRetryCount)")
+
             }
         }
         
@@ -540,13 +540,13 @@ private fun EnhancedRecipeFeedContent(
                     item {
                         if (isAuthError && isStartupPhase) {
                             // Show a more user-friendly loading state for auth errors during startup
-                            println("🏠 HomeScreen: Auth error during startup retry, showing loading state")
+            
                             EnhancedInitialLoadingState(
                                 message = "Setting up your recipes..."
                             )
                         } else if (isAuthError) {
                             // After multiple retries, show a more specific auth error
-                            println("🏠 HomeScreen: Auth error after retries, showing auth-specific error")
+            
                             EmptyState(
                                 type = EmptyStateType.CONNECTION_ERROR,
                                 onPrimaryAction = { recipeFeed.retry() },
@@ -556,7 +556,7 @@ private fun EnhancedRecipeFeedContent(
                             )
                         } else {
                             // Show connection error for actual network issues
-                            println("🏠 HomeScreen: Network error, showing connection error")
+            
                             EmptyState(
                                 type = EmptyStateType.CONNECTION_ERROR,
                                 onPrimaryAction = { recipeFeed.retry() },
@@ -576,8 +576,8 @@ private fun EnhancedRecipeFeedContent(
             item {
                 EmptyState(
                     type = EmptyStateType.NO_RECIPES,
-                    onPrimaryAction = { /* Navigate to add recipe */ },
-                    onSecondaryAction = { /* Navigate to browse recipes */ },
+                                    onPrimaryAction = { },
+                onSecondaryAction = { },
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(24.dp)

@@ -117,7 +117,7 @@ fun ProfileScreen(
                         
                         // Edit Profile Button with primary styling
                         OutlinedButton(
-                            onClick = { /* TODO: Navigate to edit profile */ },
+                            onClick = { },
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.primary
                             )
@@ -236,14 +236,14 @@ fun ProfileScreen(
                             icon = Icons.Default.Email,
                             title = "Email Preferences",
                             subtitle = "Manage your email notifications",
-                            onClick = { /* TODO */ }
+                            onClick = { }
                         )
                         
                         ProfileMenuItem(
                             icon = Icons.Default.Settings,
                             title = "App Settings",
                             subtitle = "Customize your app experience",
-                            onClick = { /* TODO */ }
+                            onClick = { }
                         )
                         
                         ProfileMenuItem(
@@ -288,13 +288,13 @@ fun ProfileScreen(
                         // Member Since
                         ProfileDetailRow(
                             label = "Member Since",
-                            value = "January 2024" // TODO: Get actual date
+                            value = "January 2024"
                         )
                         
                         // Account Type
                         ProfileDetailRow(
                             label = "Account Type",
-                            value = "Premium" // TODO: Get actual account type
+                            value = "Premium"
                         )
                     }
                 }
