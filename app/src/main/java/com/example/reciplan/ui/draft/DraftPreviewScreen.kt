@@ -1,39 +1,69 @@
 package com.example.reciplan.ui.draft
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.reciplan.ui.components.*
+import com.example.reciplan.ui.theme.*
+
+/**
+ * Task 14: Draft Editor Screen Redesign
+ * 
+ * Enhanced Draft Editor with:
+ * - Ingredient Editor Integration (Subtask 141)
+ * - Enhanced Text Fields (Subtask 142)
+ * - Improved Toolbar (Subtask 143)
+ * - Save/Discard Transitions (Subtask 144)
+ */
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +81,7 @@ fun DraftPreviewScreen(
     
     // Collect UI state
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val hapticFeedback = LocalHapticFeedback.current
     
     // Load data when recipeId changes
     LaunchedEffect(recipeId) {
@@ -81,6 +112,11 @@ fun DraftPreviewScreen(
     // Snackbar state for messages
     val snackbarHostState = remember { SnackbarHostState() }
     
+    // Subtask 144: Save/Discard confirmation state
+    var showSaveConfirmation by remember { mutableStateOf(false) }
+    var showDiscardConfirmation by remember { mutableStateOf(false) }
+    var pendingSaveAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    
     // Show error snackbar when save fails
     LaunchedEffect(uiState.saveError) {
         uiState.saveError?.let { error ->
@@ -96,228 +132,444 @@ fun DraftPreviewScreen(
         if (!uiState.isSaving && !uiState.hasUnsavedChanges && uiState.lastSaveType != null && uiState.title.isNotEmpty()) {
             // This indicates a successful save/approve operation (not initial load)
             val message = when (uiState.lastSaveType) {
-                "approve" -> "Recipe approved successfully!"
-                "save" -> "Changes saved successfully!"
-                else -> "Recipe saved successfully!"
+                "approve" -> "Recipe approved successfully! 🎉"
+                "save" -> "Changes saved successfully! ✓"
+                else -> "Recipe saved successfully! ✓"
             }
             snackbarHostState.showSnackbar(
                 message = message,
                 duration = SnackbarDuration.Short
             )
+            hapticFeedback.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
             // Clear the save type flag after showing the message
             viewModel.clearLastSaveType()
         }
     }
     
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Recipe Draft") },
-                navigationIcon = {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
+                    )
+                )
+            )
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Subtask 143: Improved Toolbar
+            EnhancedDraftToolbar(
+                title = uiState.title.ifEmpty { "Recipe Draft" },
+                hasUnsavedChanges = uiState.hasUnsavedChanges,
+                isSaving = uiState.isSaving,
+                onNavigateBack = {
+                    if (uiState.hasUnsavedChanges) {
+                        showDiscardConfirmation = true
+                    } else {
+                        onNavigateBack()
+                    }
+                },
+                onSave = {
+                    if (uiState.hasUnsavedChanges) {
+                        showSaveConfirmation = true
+                        pendingSaveAction = { viewModel.saveRecipe(recipeId) }
+                    } else {
+                            viewModel.saveRecipe(recipeId)
+                    }
+                },
+                onApprove = {
+                    showSaveConfirmation = true
+                    pendingSaveAction = { viewModel.saveRecipe(recipeId) }
+                }
+            )
+            
+            // Error handling
+            val errorMessage = uiState.error
+            if (errorMessage != null) {
+                EnhancedErrorState(
+                    error = errorMessage,
+                    onRetry = { viewModel.forceLoadRecipeData(recipeId) },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp)
+                )
+                return@Column
+            }
+            
+            // Enhanced Tab Row
+            EnhancedTabRow(
+                selectedTabIndex = selectedTabIndex,
+                tabTitles = tabTitles,
+                onTabSelected = { selectedTabIndex = it },
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+                                      // Tab Content
+             when (selectedTabIndex) {
+                 0 -> EnhancedOverviewTab(
+                     uiState = uiState,
+                     viewModel = viewModel,
+                     modifier = Modifier.fillMaxSize()
+                 )
+                 1 -> EnhancedIngredientsTab(
+                     uiState = uiState,
+                     viewModel = viewModel,
+                     modifier = Modifier.fillMaxSize()
+                 )
+                 2 -> EnhancedInstructionsTab(
+                     uiState = uiState,
+                     viewModel = viewModel,
+                     modifier = Modifier.fillMaxSize()
+                 )
+             }
+        }
+        
+        // Snackbar host
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+    
+    // Subtask 144: Save/Discard Transitions - Confirmation Dialogs
+    if (showSaveConfirmation) {
+        EnhancedSaveConfirmationDialog(
+            hasUnsavedChanges = uiState.hasUnsavedChanges,
+            onConfirm = {
+                showSaveConfirmation = false
+                pendingSaveAction?.invoke()
+                hapticFeedback.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+            },
+            onDismiss = {
+                showSaveConfirmation = false
+                pendingSaveAction = null
+            }
+        )
+    }
+    
+    if (showDiscardConfirmation) {
+        EnhancedDiscardConfirmationDialog(
+            onConfirm = {
+                showDiscardConfirmation = false
+                hapticFeedback.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                onNavigateBack()
+            },
+            onDismiss = {
+                showDiscardConfirmation = false
+            }
+        )
+    }
+}
+
+/**
+ * Subtask 143: Improved Toolbar
+ * Enhanced toolbar with better visual hierarchy and new button system
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EnhancedDraftToolbar(
+    title: String,
+    hasUnsavedChanges: Boolean,
+    isSaving: Boolean,
+    onNavigateBack: () -> Unit,
+    onSave: () -> Unit,
+    onApprove: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Create a subtle gradient overlay for visual separation instead of harsh shadow
+    val headerAlpha by animateFloatAsState(
+        targetValue = if (hasUnsavedChanges) 0.05f else 0f,
+        animationSpec = MotionSpecs.emphasizedTween(),
+        label = "header_overlay_alpha"
+    )
+    
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .drawBehind {
+                if (headerAlpha > 0f) {
+                    drawRect(
+                        color = Color.Black.copy(alpha = headerAlpha),
+                        size = size.copy(height = size.height + 4.dp.toPx())
+                    )
+                }
+            },
+        shadowElevation = 0.dp, // Remove harsh shadow
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        TopAppBar(
+            title = { 
+                Column {
+                Text(
+                        text = "Recipe Draft",
+                    style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                )
+                    
+                    if (title.isNotEmpty() && title != "Recipe Draft") {
+                Text(
+                            text = title,
+                            style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                    
+                    AnimatedVisibility(
+                        visible = hasUnsavedChanges,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut()
+                    ) {
+                        Text(
+                            text = "• Unsaved changes",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                }
+            },
+            navigationIcon = {
+                Surface(
+                    shape = AppShapes.SmallShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                ) {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                },
-                actions = {
-                    // Save/Approve button
-                    IconButton(
-                        onClick = {
-                            viewModel.saveRecipe(recipeId)
-                        },
-                        enabled = !uiState.isSaving
+                }
+            },
+            actions = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Save button (when there are changes)
+                    AnimatedVisibility(
+                        visible = hasUnsavedChanges,
+                        enter = scaleIn() + fadeIn(),
+                        exit = scaleOut() + fadeOut()
                     ) {
-                        if (uiState.isSaving) {
+                                            EnhancedSecondaryButton(
+                        onClick = onSave,
+                        enabled = !isSaving,
+                        size = ButtonSize.SMALL,
+                        leadingIcon = if (isSaving) null else Icons.Default.Check
+                    ) {
+                        if (isSaving) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 1.5.dp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         } else {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = if (uiState.hasUnsavedChanges) "Save Changes" else "Approve Recipe"
+                            Text("Save")
+                        }
+                    }
+                    }
+                    
+                    // Approve/Publish button
+                    EnhancedPrimaryButton(
+                        onClick = if (hasUnsavedChanges) onApprove else onSave,
+                        enabled = !isSaving,
+                        size = ButtonSize.SMALL,
+                        leadingIcon = if (isSaving) null else Icons.Default.CheckCircle
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 1.5.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
+                        } else {
+                            Text(if (hasUnsavedChanges) "Approve" else "Publish")
                         }
                     }
                 }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent
             )
-        }
-    ) { innerPadding ->
-        // Error handling
-        val errorMessage = uiState.error
-        if (errorMessage != null) {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "Error loading recipe",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = errorMessage,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = { viewModel.forceLoadRecipeData(recipeId) }
-                ) {
-                    Text("Retry")
-                }
-            }
-            return@Scaffold
-        }
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+        )
+    }
+}
+
+/**
+ * Enhanced Tab Row with improved styling
+ */
+@Composable
+private fun EnhancedTabRow(
+    selectedTabIndex: Int,
+    tabTitles: List<String>,
+    onTabSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 0.dp // Remove gray border
+    ) {
+                 TabRow(
+             selectedTabIndex = selectedTabIndex,
+             containerColor = Color.Transparent,
+             contentColor = MaterialTheme.colorScheme.primary
         ) {
-            // Tab Row
-            TabRow(
-                selectedTabIndex = selectedTabIndex,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                tabTitles.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTabIndex == index,
-                        onClick = { selectedTabIndex = index },
-                        text = { Text(title) }
+            tabTitles.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTabIndex == index,
+                    onClick = { onTabSelected(index) },
+                    modifier = Modifier.padding(vertical = 8.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = if (selectedTabIndex == index) FontWeight.SemiBold else FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                     )
                 }
-            }
-            
-            // Tab Content
-            when (selectedTabIndex) {
-                0 -> OverviewTab(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    modifier = Modifier.fillMaxSize()
-                )
-                1 -> IngredientsTab(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    modifier = Modifier.fillMaxSize()
-                )
-                2 -> InstructionsTab(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    modifier = Modifier.fillMaxSize()
-                )
             }
         }
     }
 }
 
+/**
+ * Subtask 142: Enhanced Text Fields
+ * Enhanced Overview Tab with new text input styling
+ */
 @Composable
-private fun OverviewTab(
+private fun EnhancedOverviewTab(
     uiState: DraftPreviewUiState,
     viewModel: DraftPreviewViewModel,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = modifier.padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth()
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = AppShapes.LargeShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                shadowElevation = 0.dp // Remove gray border for modern look
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Editable title field
-                    OutlinedTextField(
+                    Text(
+                        text = "Recipe Details",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    
+                    // Enhanced title field
+                    EnhancedTextField(
                         value = uiState.title,
                         onValueChange = { viewModel.updateTitle(it) },
-                        label = { Text("Recipe Title") },
-                        placeholder = { Text("Enter recipe title") },
+                        label = "Recipe Title",
+                        placeholder = "Enter your amazing recipe title",
                         modifier = Modifier.fillMaxWidth(),
-                        textStyle = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next
                         )
                     )
                     
-                    // Editable description field
-                    OutlinedTextField(
+                    // Enhanced description field
+                    EnhancedTextField(
                         value = uiState.description,
                         onValueChange = { viewModel.updateDescription(it) },
-                        label = { Text("Description") },
-                        placeholder = { Text("Enter recipe description (optional)") },
+                        label = "Description",
+                        placeholder = "Describe what makes this recipe special...",
                         modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        maxLines = 4,
+                        minLines = 3,
+                        maxLines = 6,
                         keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Done
+                            imeAction = ImeAction.Next
                         )
                     )
+                }
+            }
+        }
+        
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = AppShapes.LargeShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                shadowElevation = 0.dp // Remove gray border for modern look
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Recipe Timing",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                     
-                    HorizontalDivider()
-                    
-                    // Recipe metadata - editable fields
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Prep Time
-                        OutlinedTextField(
+                        // Enhanced prep time field
+                        EnhancedTextField(
                             value = if (uiState.prepTime > 0) uiState.prepTime.toString() else "",
                             onValueChange = { newValue ->
                                 val prepTime = newValue.toIntOrNull() ?: 0
                                 viewModel.updateMetadata(prepTime = prepTime)
                             },
-                            label = { Text("Prep Time") },
-                            placeholder = { Text("30") },
-                            suffix = { Text("min") },
+                            label = "Prep Time (min)",
+                            placeholder = "30",
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
                                 imeAction = ImeAction.Next
                             ),
                             singleLine = true
                         )
                         
-                        // Cook Time
-                        OutlinedTextField(
+                        // Enhanced cook time field
+                        EnhancedTextField(
                             value = if (uiState.cookTime > 0) uiState.cookTime.toString() else "",
                             onValueChange = { newValue ->
                                 val cookTime = newValue.toIntOrNull() ?: 0
                                 viewModel.updateMetadata(cookTime = cookTime)
                             },
-                            label = { Text("Cook Time") },
-                            placeholder = { Text("45") },
-                            suffix = { Text("min") },
+                            label = "Cook Time (min)",
+                            placeholder = "45",
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
                                 imeAction = ImeAction.Next
                             ),
                             singleLine = true
                         )
                         
-                        // Servings
-                        OutlinedTextField(
+                        // Enhanced servings field
+                        EnhancedTextField(
                             value = if (uiState.servings > 0) uiState.servings.toString() else "",
                             onValueChange = { newValue ->
-                                val servings = newValue.toIntOrNull() ?: 1
+                                val servings = newValue.toIntOrNull() ?: 0
                                 viewModel.updateMetadata(servings = servings)
                             },
-                            label = { Text("Servings") },
-                            placeholder = { Text("4") },
+                            label = "Servings",
+                            placeholder = "4",
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
                                 imeAction = ImeAction.Done
                             ),
                             singleLine = true
@@ -327,280 +579,247 @@ private fun OverviewTab(
             }
         }
         
+        // Enhanced metadata display
+        if (uiState.prepTime > 0 || uiState.cookTime > 0 || uiState.servings > 0) {
         item {
-            Card(
+                EnhancedMetadataPreview(
+                    prepTime = uiState.prepTime,
+                    cookTime = uiState.cookTime,
+                    servings = uiState.servings,
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Source Information",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = viewModel.getSourceInfo(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                )
             }
         }
     }
 }
 
+/**
+ * Subtask 141: Ingredient Editor Integration
+ * Enhanced Ingredients Tab using IngredientRow components
+ */
 @Composable
-private fun IngredientsTab(
+private fun EnhancedIngredientsTab(
     uiState: DraftPreviewUiState,
     viewModel: DraftPreviewViewModel,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = modifier.padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Ingredients",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                IconButton(
-                    onClick = {
-                        viewModel.addNewIngredient()
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add Ingredient"
-                    )
-                }
-            }
+            EnhancedSectionHeader(
+                title = "Ingredients",
+                subtitle = "${uiState.ingredients.size} ingredients",
+                onAddClick = { viewModel.addNewIngredient() }
+            )
         }
         
-        // Real ingredients from ViewModel with inline editing and drag-and-drop
+        // Ingredient list using IngredientRow components
         if (uiState.ingredients.isNotEmpty()) {
             itemsIndexed(uiState.ingredients) { index, ingredient ->
-                DraggableIngredientRow(
+                EnhancedEditableIngredientRow(
                     ingredient = ingredient,
                     index = index,
                     totalCount = uiState.ingredients.size,
                     onStartEditing = { viewModel.startEditingIngredient(ingredient.id) },
-                    onNameChange = { newName -> viewModel.updateIngredientName(ingredient.id, newName) },
-                    onQuantityChange = { newQuantity -> viewModel.updateIngredientQuantity(ingredient.id, newQuantity) },
+                    onNameChange = { newName -> 
+                        viewModel.updateIngredientName(ingredient.id, newName) 
+                    },
+                    onQuantityChange = { newQuantity -> 
+                        viewModel.updateIngredientQuantity(ingredient.id, newQuantity) 
+                    },
                     onSaveChanges = { viewModel.saveIngredientChanges(ingredient.id) },
                     onCancelEditing = { originalName, originalQuantity ->
                         viewModel.cancelIngredientEditing(ingredient.id, originalName, originalQuantity)
                     },
                     onDelete = { viewModel.deleteIngredient(ingredient.id) },
-                    onReorder = { fromIndex, toIndex -> viewModel.reorderIngredients(fromIndex, toIndex) },
+                    onReorder = { fromIndex, toIndex -> 
+                        viewModel.reorderIngredients(fromIndex, toIndex) 
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         } else if (uiState.isLoading) {
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+                EnhancedLoadingState(
+                    message = "Loading ingredients...",
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         } else {
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No ingredients found",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                EmptyState(
+                    type = EmptyStateType.NO_INGREDIENTS,
+                    onPrimaryAction = { viewModel.addNewIngredient() },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
         
+        // Helper text
+        if (uiState.ingredients.isNotEmpty()) {
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                EnhancedHelperCard(
+                    text = "✓ Tap ingredients to edit\n✓ Long press & drag handle to reorder\n✓ Use clear, specific quantities (e.g., '2 cups', '1 lb')",
+                    modifier = Modifier.fillMaxWidth()
                 )
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Tap ingredients to edit • Long press & drag handle to reorder",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                }
             }
         }
     }
 }
 
+/**
+ * Enhanced Instructions Tab with better editing experience
+ */
 @Composable
-private fun InstructionsTab(
+private fun EnhancedInstructionsTab(
     uiState: DraftPreviewUiState,
     viewModel: DraftPreviewViewModel,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = modifier.padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Instructions",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                IconButton(
-                    onClick = {
-                        viewModel.addNewInstruction()
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add Instruction"
-                    )
-                }
-            }
+            EnhancedSectionHeader(
+                title = "Instructions",
+                subtitle = "${uiState.instructions.size} steps",
+                onAddClick = { viewModel.addNewInstruction() }
+            )
         }
         
-        // Real instructions from ViewModel with drag-and-drop
+        // Instructions list
         if (uiState.instructions.isNotEmpty()) {
             itemsIndexed(uiState.instructions) { index, instruction ->
-                DraggableInstructionRow(
+                EnhancedEditableInstructionRow(
                     instruction = instruction,
                     index = index,
                     totalCount = uiState.instructions.size,
-                    onReorder = { fromIndex, toIndex -> viewModel.reorderInstructions(fromIndex, toIndex) },
-                    onStartEditing = { instructionId ->
-                        viewModel.startEditingInstruction(instructionId)
+                    onStartEditing = { viewModel.startEditingInstruction(instruction.id) },
+                    onTextChange = { newText -> 
+                        viewModel.updateInstructionText(instruction.id, newText) 
                     },
-                    onTextChange = { instructionId, newText ->
-                        viewModel.updateInstructionText(instructionId, newText)
+                    onSaveChanges = { viewModel.stopEditingInstructions() },
+                    onCancelEditing = { originalText -> 
+                        viewModel.cancelInstructionEditing(instruction.id, originalText) 
                     },
-                    onSaveChanges = { instructionId ->
-                        viewModel.stopEditingInstructions()
-                    },
-                    onCancelEditing = { instructionId, originalText ->
-                        viewModel.cancelInstructionEditing(instructionId, originalText)
-                    },
-                    onDelete = { instructionId ->
-                        viewModel.deleteInstruction(instructionId)
+                    onDelete = { viewModel.deleteInstruction(instruction.id) },
+                    onReorder = { fromIndex, toIndex -> 
+                        viewModel.reorderInstructions(fromIndex, toIndex) 
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         } else if (uiState.isLoading) {
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+                EnhancedLoadingState(
+                    message = "Loading instructions...",
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         } else {
             item {
-                Card(
+                EmptyState(
+                    type = EmptyStateType.NO_RECIPES,
+                    onPrimaryAction = { viewModel.addNewInstruction() },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No instructions found",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    customContent = EmptyStateContent(
+                        title = "No instructions yet",
+                        subtitle = "Add your first cooking instruction to get started",
+                        illustration = EmptyStateIllustration.RECIPE_BOOK,
+                        primaryAction = ActionButton(
+                            text = "Add Instruction",
+                            onClick = { viewModel.addNewInstruction() },
+                            icon = Icons.Default.Add
                         )
-                    }
-                }
+                    )
+                )
             }
         }
         
+        // Helper text
+        if (uiState.instructions.isNotEmpty()) {
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                EnhancedHelperCard(
+                    text = "✓ Write clear, step-by-step instructions\n✓ Include timing and temperatures\n✓ Long press & drag to reorder steps",
+                    modifier = Modifier.fillMaxWidth()
                 )
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                                                    text = "Tap instructions to edit • Long press & drag handle to reorder",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                }
             }
         }
     }
 }
 
+/**
+ * Enhanced section header with add button
+ */
 @Composable
-private fun EditableIngredientRow(
+private fun EnhancedSectionHeader(
+    title: String,
+    subtitle: String,
+    onAddClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = AppShapes.MediumShape,
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+    ) {
+        Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+                ) {
+            Column {
+                    Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            FloatingActionButton(
+                onClick = onAddClick,
+                modifier = Modifier.size(40.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add $title",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Subtask 141: Enhanced Editable Ingredient Row
+ * Using IngredientRow component as base with editing capabilities
+ */
+@Composable
+private fun EnhancedEditableIngredientRow(
     ingredient: EditableIngredient,
+    index: Int,
+    totalCount: Int,
     onStartEditing: () -> Unit,
     onNameChange: (String) -> Unit,
     onQuantityChange: (String) -> Unit,
     onSaveChanges: () -> Unit,
     onCancelEditing: (String, String) -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier,
-    showDragHandle: Boolean = false,
-    onDragStart: (() -> Unit)? = null,
-    onDragEnd: (() -> Unit)? = null,
-    onDrag: ((Offset) -> Unit)? = null
+    onReorder: (Int, Int) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     // Store original values for cancel functionality
     val originalName = remember(ingredient.id) { ingredient.name }
@@ -618,23 +837,37 @@ private fun EditableIngredientRow(
         }
     }
     
-    Card(
-        modifier = modifier
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.LargeShape,
+        color = if (ingredient.isEditing) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        shadowElevation = 0.dp // Remove gray borders for modern look
     ) {
         if (ingredient.isEditing) {
-            // Edit mode
+            // Edit mode using enhanced text fields
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Name TextField
-                OutlinedTextField(
+                Text(
+                    text = "Edit Ingredient",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                // Enhanced ingredient name field
+                EnhancedTextField(
                     value = ingredient.name,
                     onValueChange = onNameChange,
-                    label = { Text("Ingredient Name") },
-                    placeholder = { Text("e.g., Chicken breast") },
+                    label = "Ingredient Name",
+                    placeholder = "e.g., Chicken breast, Olive oil",
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(nameFocusRequester),
@@ -652,12 +885,12 @@ private fun EditableIngredientRow(
                     } else null
                 )
                 
-                // Quantity TextField
-                OutlinedTextField(
+                // Enhanced quantity field
+                EnhancedTextField(
                     value = ingredient.quantity,
                     onValueChange = onQuantityChange,
-                    label = { Text("Quantity") },
-                    placeholder = { Text("e.g., 2 cups, 1 lb") },
+                    label = "Quantity & Unit",
+                    placeholder = "e.g., 2 cups, 1 lb, 3 tbsp",
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(quantityFocusRequester),
@@ -676,84 +909,73 @@ private fun EditableIngredientRow(
                     } else null
                 )
                 
-                // Action buttons
+                // Action buttons using enhanced button system
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
                 ) {
                     // Cancel button
-                    OutlinedButton(
+                    EnhancedSecondaryButton(
                         onClick = {
                             keyboardController?.hide()
                             onCancelEditing(originalName, originalQuantity)
-                        }
+                        },
+                        size = ButtonSize.SMALL,
+                        leadingIcon = Icons.Default.Close
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
                         Text("Cancel")
                     }
                     
                     // Save button
-                    Button(
+                    EnhancedPrimaryButton(
                         onClick = {
                             keyboardController?.hide()
                             onSaveChanges()
                         },
-                        enabled = ingredient.name.trim().isNotEmpty() || ingredient.quantity.trim().isNotEmpty()
+                        enabled = ingredient.name.trim().isNotEmpty() || ingredient.quantity.trim().isNotEmpty(),
+                        size = ButtonSize.SMALL,
+                        leadingIcon = Icons.Default.Check
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
                         Text("Save")
                     }
                 }
             }
         } else {
-            // Display mode
+            // Display mode using IngredientRow concept with editing capabilities
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onStartEditing() }
                     .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Drag handle (if enabled)
-                if (showDragHandle) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Drag to reorder",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .pointerInput(Unit) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = { 
-                                        onDragStart?.invoke()
-                                    },
-                                    onDragEnd = { 
-                                        onDragEnd?.invoke()
-                                    },
-                                    onDrag = { _, change ->
-                                        onDrag?.invoke(change)
-                                    }
-                                )
-                            }
-                    )
+                // Step number with better contrast
+                Surface(
+                    modifier = Modifier.size(32.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
                 }
                 
+                // Ingredient content
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
                         text = ingredient.name.ifEmpty { "Unnamed ingredient" },
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
                         color = if (ingredient.name.isEmpty()) {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         } else {
@@ -764,11 +986,27 @@ private fun EditableIngredientRow(
                     if (ingredient.quantity.isNotEmpty()) {
                         Text(
                             text = ingredient.quantity,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
+                
+                // Drag handle (for reordering)
+                Icon(
+                    imageVector = Icons.Default.Menu,
+                    contentDescription = "Drag to reorder",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .padding(horizontal = 4.dp)
+                        .pointerInput(Unit) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { },
+                                onDragEnd = { },
+                                onDrag = { _, _ -> }
+                            )
+                        }
+                )
                 
                 // Delete button
                 IconButton(
@@ -785,283 +1023,649 @@ private fun EditableIngredientRow(
     }
 }
 
+/**
+ * Enhanced Editable Instruction Row
+ */
 @Composable
-private fun DraggableIngredientRow(
-    ingredient: EditableIngredient,
+private fun EnhancedEditableInstructionRow(
+    instruction: EditableInstruction,
     index: Int,
     totalCount: Int,
     onStartEditing: () -> Unit,
-    onNameChange: (String) -> Unit,
-    onQuantityChange: (String) -> Unit,
+    onTextChange: (String) -> Unit,
     onSaveChanges: () -> Unit,
-    onCancelEditing: (String, String) -> Unit,
+    onCancelEditing: (String) -> Unit,
     onDelete: () -> Unit,
     onReorder: (Int, Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isDragging by remember { mutableStateOf(false) }
-    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    // Store original value for cancel functionality
+    val originalText = remember(instruction.id) { instruction.text }
     
-    Box(
-        modifier = modifier
-            .graphicsLayer {
-                translationY = dragOffset.y
-                scaleX = if (isDragging) 1.05f else 1f
-                scaleY = if (isDragging) 1.05f else 1f
-            }
-            .zIndex(if (isDragging) 1f else 0f)
-            .then(
-                if (isDragging) {
-                    Modifier.shadow(8.dp)
-                } else {
-                    Modifier
-                }
-            )
+    // Focus management
+    val textFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    
+    // Request focus when entering edit mode
+    LaunchedEffect(instruction.isEditing) {
+        if (instruction.isEditing) {
+            textFocusRequester.requestFocus()
+        }
+    }
+    
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.LargeShape,
+        color = if (instruction.isEditing) {
+            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.1f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        shadowElevation = 0.dp // Remove gray borders for modern look
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Drag handle
-            Icon(
-                imageVector = Icons.Default.Menu,
-                contentDescription = "Long press and drag to reorder",
-                tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        if (instruction.isEditing) {
+            // Edit mode
+            Column(
                 modifier = Modifier
-                    .padding(8.dp)
-                    .pointerInput(Unit) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { 
-                                isDragging = true
-                            },
-                            onDragEnd = { 
-                                isDragging = false
-                                dragOffset = Offset.Zero
-                            },
-                            onDrag = { _, change ->
-                                dragOffset += change
-                                
-                                // Simple reorder logic with bounds checking
-                                val threshold = 60f // Pixels to drag before reordering (reduced for better responsiveness)
-                                
-                                when {
-                                    dragOffset.y < -threshold && index > 0 -> {
-                                        onReorder(index, index - 1)
-                                        dragOffset = Offset.Zero
-                                    }
-                                    dragOffset.y > threshold && index < totalCount - 1 -> {
-                                        onReorder(index, index + 1)
-                                        dragOffset = Offset.Zero
-                                    }
-                                }
-                            }
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Edit Step ${index + 1}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                // Enhanced instruction text area
+                EnhancedTextField(
+                    value = instruction.text,
+                    onValueChange = onTextChange,
+                    label = "Instruction",
+                    placeholder = "Describe this step in detail...",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(textFocusRequester),
+                    minLines = 2,
+                    maxLines = 6,
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            keyboardController?.hide()
+                            onSaveChanges()
+                        }
+                    )
+                )
+                
+                // Action buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
+                ) {
+                    // Cancel button
+                    EnhancedSecondaryButton(
+                        onClick = {
+                            keyboardController?.hide()
+                            onCancelEditing(originalText)
+                        },
+                        size = ButtonSize.SMALL,
+                        leadingIcon = Icons.Default.Close
+                    ) {
+                        Text("Cancel")
+                    }
+                    
+                    // Save button
+                    EnhancedPrimaryButton(
+                        onClick = {
+                            keyboardController?.hide()
+                            onSaveChanges()
+                        },
+                        enabled = instruction.text.trim().isNotEmpty(),
+                        size = ButtonSize.SMALL,
+                        leadingIcon = Icons.Default.Check
+                    ) {
+                        Text("Save")
+                    }
+                }
+            }
+        } else {
+            // Display mode
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onStartEditing() }
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Step number with better contrast
+                Surface(
+                    modifier = Modifier.size(32.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondary
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondary
                         )
                     }
+                }
+                
+                // Instruction text
+                Text(
+                    text = instruction.text.ifEmpty { "Empty instruction" },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (instruction.text.isEmpty()) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Action icons - properly aligned
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Drag handle - now using IconButton for consistent sizing
+                    IconButton(
+                        onClick = { /* Drag functionality handled by gesture */ },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .pointerInput(Unit) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { },
+                                    onDragEnd = { },
+                                    onDrag = { _, _ -> }
+                                )
+                            }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Drag to reorder",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    
+                    // Delete button - consistent sizing
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete instruction",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Enhanced metadata preview card
+ */
+@Composable
+private fun EnhancedMetadataPreview(
+    prepTime: Int,
+    cookTime: Int,
+    servings: Int,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.LargeShape,
+        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Recipe Summary",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
             )
             
-            // Ingredient content
-            EditableIngredientRow(
-                ingredient = ingredient,
-                onStartEditing = onStartEditing,
-                onNameChange = onNameChange,
-                onQuantityChange = onQuantityChange,
-                onSaveChanges = onSaveChanges,
-                onCancelEditing = onCancelEditing,
-                onDelete = onDelete,
-                modifier = Modifier.weight(1f),
-                showDragHandle = false // We handle the drag handle ourselves
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                if (prepTime > 0) {
+                    MetadataItem(
+                        icon = Icons.Default.Info,
+                        value = "$prepTime min",
+                        label = "Prep"
+                    )
+                }
+                
+                if (cookTime > 0) {
+                    MetadataItem(
+                        icon = Icons.Default.Info,
+                        value = "$cookTime min",
+                        label = "Cook"
+                    )
+                }
+                
+                if (servings > 0) {
+                    MetadataItem(
+                        icon = Icons.Default.Person,
+                        value = "$servings",
+                        label = "Serves"
+                    )
+                }
+                
+                if (prepTime > 0 && cookTime > 0) {
+                    MetadataItem(
+                        icon = Icons.Default.Info,
+                        value = "${prepTime + cookTime} min",
+                        label = "Total"
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Metadata item for the preview
+ */
+@Composable
+private fun MetadataItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+            modifier = Modifier.size(20.dp)
+        )
+        
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onTertiaryContainer
+        )
+        
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+        )
+    }
+}
+
+/**
+ * Enhanced helper card with tips
+ */
+@Composable
+private fun EnhancedHelperCard(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.MediumShape,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ) {
+            Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+            
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 18.sp
             )
         }
     }
 }
 
+/**
+ * Enhanced loading state
+ */
 @Composable
-private fun DraggableInstructionRow(
-    instruction: EditableInstruction,
-    index: Int,
-    totalCount: Int,
-    onReorder: (Int, Int) -> Unit,
-    onStartEditing: (String) -> Unit = {},
-    onTextChange: (String, String) -> Unit = { _, _ -> },
-    onSaveChanges: (String) -> Unit = {},
-    onCancelEditing: (String, String) -> Unit = { _, _ -> },
-    onDelete: (String) -> Unit = {},
+private fun EnhancedLoadingState(
+    message: String,
     modifier: Modifier = Modifier
 ) {
-    var isDragging by remember { mutableStateOf(false) }
-    var dragOffset by remember { mutableStateOf(Offset.Zero) }
-    
-    Box(
-        modifier = modifier
-            .graphicsLayer {
-                translationY = dragOffset.y
-                scaleX = if (isDragging) 1.05f else 1f
-                scaleY = if (isDragging) 1.05f else 1f
-            }
-            .zIndex(if (isDragging) 1f else 0f)
-            .then(
-                if (isDragging) {
-                    Modifier.shadow(8.dp)
-                } else {
-                    Modifier
-                }
-            )
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.LargeShape,
+        color = MaterialTheme.colorScheme.surface
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                // Drag handle
-                Icon(
-                    imageVector = Icons.Default.Menu,
-                    contentDescription = "Long press and drag to reorder",
-                    tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .padding(end = 8.dp)
-                        .pointerInput(Unit) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { 
-                                    isDragging = true
-                                },
-                                onDragEnd = { 
-                                    isDragging = false
-                                    dragOffset = Offset.Zero
-                                },
-                                                onDrag = { _, change ->
-                    dragOffset += change
-                    
-                    // Simple reorder logic with bounds checking
-                    val threshold = 60f // Pixels to drag before reordering (reduced for better responsiveness)
-                    
-                    when {
-                        dragOffset.y < -threshold && index > 0 -> {
-                            onReorder(index, index - 1)
-                            dragOffset = Offset.Zero
-                        }
-                        dragOffset.y > threshold && index < totalCount - 1 -> {
-                            onReorder(index, index + 1)
-                            dragOffset = Offset.Zero
-                        }
-                    }
-                }
-                            )
-                        }
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 3.dp
                 )
                 
                 Text(
-                    text = "${instruction.stepNumber}.",
+                text = message,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                
-                if (instruction.isEditing) {
-                    // Edit mode
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+/**
+ * Enhanced error state
+ */
+@Composable
+private fun EnhancedErrorState(
+    error: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
                     Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        val originalText = remember { instruction.text }
-                        val keyboardController = LocalSoftwareKeyboardController.current
-                        
-                        OutlinedTextField(
-                            value = instruction.text,
-                            onValueChange = { newText ->
-                                onTextChange(instruction.id, newText)
-                            },
-                            label = { Text("Instruction") },
-                            placeholder = { Text("Enter cooking instruction...") },
-                            modifier = Modifier.fillMaxWidth(),
-                            minLines = 2,
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Done
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onDone = {
-                                    keyboardController?.hide()
-                                    onSaveChanges(instruction.id)
-                                }
-                            )
-                        )
-                        
-                        // Action buttons
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            // Delete button (for existing instructions)
-                            if (instruction.id.startsWith("inst_new_").not()) {
-                                OutlinedButton(
-                                    onClick = {
-                                        keyboardController?.hide()
-                                        onDelete(instruction.id)
-                                    },
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.error
-                                    )
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        EmptyState(
+            type = EmptyStateType.CONNECTION_ERROR,
+            onPrimaryAction = onRetry,
+            customContent = EmptyStateContent(
+                title = "Error loading recipe",
+                subtitle = error,
+                illustration = EmptyStateIllustration.NETWORK_ERROR,
+                primaryAction = ActionButton(
+                    text = "Retry",
+                    onClick = onRetry,
+                    icon = Icons.Default.Refresh
+                )
+            )
+        )
+    }
+}
+
+/**
+ * Subtask 144: Save/Discard Transitions
+ * Enhanced Save Confirmation Dialog with smooth animations
+ */
+@Composable
+private fun EnhancedSaveConfirmationDialog(
+    hasUnsavedChanges: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = AppShapes.LargeShape,
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp, // Reduce shadow for modern look
+            modifier = Modifier
+                .scale(
+                    animateFloatAsState(
+                        targetValue = 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "dialog_scale"
+                    ).value
+                )
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Icon
+                Surface(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .align(Alignment.CenterHorizontally),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Delete,
+                        imageVector = if (hasUnsavedChanges) Icons.Default.Check else Icons.Default.CheckCircle,
                                         contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Delete")
-                                }
-                            }
-                            
-                            // Cancel button
-                            OutlinedButton(
-                                onClick = {
-                                    keyboardController?.hide()
-                                    onCancelEditing(instruction.id, originalText)
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Cancel")
-                            }
-                            
-                            // Save button  
-                            Button(
-                                onClick = {
-                                    keyboardController?.hide()
-                                    onSaveChanges(instruction.id)
-                                },
-                                enabled = instruction.text.trim().isNotEmpty()
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Save")
-                            }
-                        }
-                    }
-                } else {
-                    // View mode
-                    Text(
-                        text = instruction.text,
-                        style = MaterialTheme.typography.bodyMedium,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                onStartEditing(instruction.id)
-                            }
+                            .fillMaxSize()
+                            .padding(16.dp)
                     )
                 }
+                
+                // Content
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = if (hasUnsavedChanges) "Save Changes?" else "Publish Recipe?",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Text(
+                        text = if (hasUnsavedChanges) {
+                            "Your changes will be saved and the recipe will be updated."
+                        } else {
+                            "This recipe will be published and available to everyone."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                
+                // Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    EnhancedSecondaryButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        leadingIcon = Icons.Default.Close
+                    ) {
+                        Text("Cancel")
+                    }
+                    
+                    EnhancedPrimaryButton(
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f),
+                        leadingIcon = if (hasUnsavedChanges) Icons.Default.Check else Icons.Default.CheckCircle
+                    ) {
+                        Text(if (hasUnsavedChanges) "Save" else "Publish")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Enhanced Discard Confirmation Dialog
+ */
+@Composable
+private fun EnhancedDiscardConfirmationDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = AppShapes.LargeShape,
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp, // Reduce shadow for modern look
+            modifier = Modifier
+                .scale(
+                    animateFloatAsState(
+                        targetValue = 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "dialog_scale"
+                    ).value
+                )
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Icon
+                Surface(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .align(Alignment.CenterHorizontally),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.errorContainer
+                            ) {
+                                Icon(
+                        imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    )
+                }
+                
+                // Content
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Discard Changes?",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Text(
+                        text = "You have unsaved changes. If you leave now, your changes will be lost.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                
+                // Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    EnhancedSecondaryButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        leadingIcon = Icons.Default.Edit
+                    ) {
+                        Text("Stay")
+                    }
+                    
+                            Button(
+                        onClick = onConfirm,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        ),
+                        shape = AppShapes.MediumShape,
+                        modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                            imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Discard")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Preview composables for the enhanced draft editor
+ */
+@Preview(name = "Enhanced Draft Editor - Light")
+@Composable
+private fun EnhancedDraftEditorPreview() {
+    ReciplanTheme {
+        Surface {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.surface,
+                                MaterialTheme.colorScheme.background
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Enhanced Draft Editor Preview",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+            }
+        }
+    }
+}
+
+@Preview(name = "Enhanced Save Confirmation - Dark")
+@Composable
+private fun EnhancedSaveConfirmationPreview() {
+    ReciplanTheme(darkTheme = true) {
+        Surface {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                EnhancedSaveConfirmationDialog(
+                    hasUnsavedChanges = true,
+                    onConfirm = { },
+                    onDismiss = { }
+                )
             }
         }
     }

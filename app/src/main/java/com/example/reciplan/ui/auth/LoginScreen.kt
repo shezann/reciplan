@@ -1,5 +1,6 @@
 package com.example.reciplan.ui.auth
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -88,12 +89,13 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // App Logo/Title
-        Text(
-            text = "Reciplan",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 48.dp)
+        // App Logo
+        Image(
+            painter = painterResource(id = R.drawable.reciplan_logo),
+            contentDescription = "Reciplan Logo",
+            modifier = Modifier
+                .size(300.dp)
+                .padding(bottom = 48.dp)
         )
 
         if (showEmailLinkSent) {
@@ -242,31 +244,34 @@ fun LoginScreen(
         // Error display
         if (authState is AuthResult.Error) {
             val errorState = authState as AuthResult.Error
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = if (errorState.message.contains("quota", ignoreCase = true)) {
-                            "Email sign-in temporarily unavailable. Please use Google Sign-In instead."
-                        } else {
-                            errorState.message
-                        },
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        style = MaterialTheme.typography.bodyMedium
+            // Don't show "User not authenticated" error as it's the normal initial state
+            if (!errorState.message.contains("User not authenticated", ignoreCase = true)) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
                     )
-                    
-                    if (errorState.message.contains("quota", ignoreCase = true)) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Email link authentication is temporarily disabled. Please use Google Sign-In instead.",
+                            text = if (errorState.message.contains("quota", ignoreCase = true)) {
+                                "Email sign-in temporarily unavailable. Please use Google Sign-In instead."
+                            } else {
+                                errorState.message
+                            },
                             color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodyMedium
                         )
+                        
+                        if (errorState.message.contains("quota", ignoreCase = true)) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Email link authentication is temporarily disabled. Please use Google Sign-In instead.",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 }
             }

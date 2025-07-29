@@ -1,9 +1,7 @@
 package com.example.reciplan.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -28,9 +26,19 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.reciplan.ui.theme.ReciplanTheme
+import kotlinx.coroutines.delay
+
+// Performance optimizations
+import com.example.reciplan.ui.theme.OptimizedAnimations
+import com.example.reciplan.ui.theme.RecompositionOptimizations
 
 /**
- * A reusable like button component with heart icon, animations, and accessibility support
+ * Enhanced LikeButton component with improved animations, haptic feedback, and performance
+ * 
+ * Features:
+ * - Heart scaling animation with spring physics (Subtask 31)
+ * - Enhanced haptic feedback for different states (Subtask 32) 
+ * - Performance optimization with debouncing (Subtask 33)
  * 
  * @param isLiked Current like state
  * @param likesCount Number of likes to display
@@ -40,6 +48,7 @@ import com.example.reciplan.ui.theme.ReciplanTheme
  * @param enabled Whether the button is enabled
  * @param showCount Whether to show the likes count
  * @param contentDescription Custom content description for accessibility
+ * @param hasError Whether there's an error state to trigger error haptics
  */
 @Composable
 fun LikeButton(
@@ -50,53 +59,97 @@ fun LikeButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     showCount: Boolean = true,
-    contentDescription: String? = null
+    contentDescription: String? = null,
+    hasError: Boolean = false
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     
-    // Animation states
-    val scale by animateFloatAsState(
-        targetValue = if (isLoading) 0.9f else 1f,
-        animationSpec = spring(
-            dampingRatio = 0.6f,
-            stiffness = 300f
+    // Subtask 33: Performance Optimization - Debouncing state
+    var lastClickTime by remember { mutableLongStateOf(0L) }
+    var isPressed by remember { mutableStateOf(false) }
+    val debounceTime = 300L // Prevent rapid taps within 300ms
+    
+    // Subtask 181: Optimized heart scaling animation for 60fps performance
+    val heartScale by animateFloatAsState(
+        targetValue = when {
+            isLoading -> 0.8f
+            isPressed -> 1.3f // Larger scale for more satisfying bounce
+            else -> 1f
+        },
+        animationSpec = OptimizedAnimations.performantSpring(
+            dampingRatio = 0.6f, // Optimized damping for stability and bounce
+            stiffness = 500f,    // Higher stiffness for better performance
+            visibilityThreshold = 0.01f
         ),
-        label = "scale_animation"
+        finishedListener = { finalValue ->
+            // Reset pressed state after animation completes
+            if (finalValue == 1.3f) {
+                isPressed = false
+            }
+        },
+        label = "optimized_heart_scale"
     )
     
+    // Subtask 181: Optimized color animation with frame-aligned timing
     val heartColor by animateColorAsState(
         targetValue = when {
+            hasError -> MaterialTheme.colorScheme.error
             isLoading -> MaterialTheme.colorScheme.outline
             isLiked -> Color(0xFFE91E63) // Pink/Red color for liked state
             else -> MaterialTheme.colorScheme.outline
         },
-        animationSpec = tween(durationMillis = 200),
-        label = "color_animation"
+        animationSpec = OptimizedAnimations.performantTween<Color>(
+            baseDurationMs = 250
+        ),
+        label = "optimized_heart_color"
     )
     
+    // Subtask 32: Enhanced Haptic Feedback - Different haptics for different states
+    LaunchedEffect(hasError) {
+        if (hasError) {
+            // Error haptic feedback
+            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
+    
     // Content description for accessibility
-    val accessibilityDescription = contentDescription ?: if (isLiked) {
-        "Unlike. Currently $likesCount likes"
-    } else {
-        "Like. Currently $likesCount likes"
+    val accessibilityDescription = contentDescription ?: when {
+        hasError -> "Error occurred. Try again."
+        isLoading -> "Loading likes..."
+        isLiked -> "Unlike. Currently $likesCount likes"
+        else -> "Like. Currently $likesCount likes"
     }
     
     Row(
         modifier = modifier
             .clip(CircleShape)
             .clickable(
-                enabled = enabled && !isLoading,
+                enabled = enabled && !isLoading && !hasError,
                 onClick = {
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onClick()
+                    // Subtask 33: Performance Optimization - Debouncing logic
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastClickTime >= debounceTime) {
+                        lastClickTime = currentTime
+                        isPressed = true
+                        
+                        // Subtask 32: Haptic Feedback Integration - Different haptics for like/unlike
+                        val hapticType = if (isLiked) {
+                            HapticFeedbackType.LongPress // Stronger haptic for unlike
+                        } else {
+                            HapticFeedbackType.TextHandleMove // Lighter haptic for like
+                        }
+                        hapticFeedback.performHapticFeedback(hapticType)
+                        
+                        onClick()
+                    }
                 },
-                indication = null, // Use default Material 3 ripple
+                indication = null, // Custom animation replaces ripple
                 interactionSource = remember { MutableInteractionSource() }
             )
             .semantics {
                 this.contentDescription = accessibilityDescription
                 this.role = Role.Button
-                if (!enabled || isLoading) {
+                if (!enabled || isLoading || hasError) {
                     disabled()
                 }
             }
@@ -116,11 +169,19 @@ fun LikeButton(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+                hasError -> {
+                    Icon(
+                        imageVector = Icons.Filled.FavoriteBorder,
+                        contentDescription = null,
+                        modifier = Modifier.scale(heartScale),
+                        tint = heartColor
+                    )
+                }
                 else -> {
                     Icon(
                         imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = null, // Handled by parent semantics
-                        modifier = Modifier.scale(scale),
+                        modifier = Modifier.scale(heartScale),
                         tint = heartColor
                     )
                 }
@@ -134,10 +195,10 @@ fun LikeButton(
                     fontWeight = if (isLiked) FontWeight.SemiBold else FontWeight.Normal,
                     fontSize = 12.sp
                 ),
-                color = if (enabled && !isLoading) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    MaterialTheme.colorScheme.outline
+                color = when {
+                    hasError -> MaterialTheme.colorScheme.error
+                    enabled && !isLoading -> MaterialTheme.colorScheme.onSurface
+                    else -> MaterialTheme.colorScheme.outline
                 }
             )
         }
@@ -158,55 +219,38 @@ private fun formatLikesCount(count: Int): String {
 }
 
 /**
- * Animated like button that triggers a bounce effect when clicked
+ * Advanced animated like button with enhanced spring physics and performance optimizations
+ * This component demonstrates the full enhanced feature set
  */
 @Composable
-fun AnimatedLikeButton(
+fun EnhancedAnimatedLikeButton(
     isLiked: Boolean,
     likesCount: Int,
     isLoading: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    showCount: Boolean = true
+    showCount: Boolean = true,
+    hasError: Boolean = false
 ) {
-    var isPressed by remember { mutableStateOf(false) }
-    
-    val bounceScale by animateFloatAsState(
-        targetValue = when {
-            isLoading -> 0.9f
-            isPressed -> 1.2f
-            else -> 1f
-        },
-        animationSpec = spring(
-            dampingRatio = 0.4f,
-            stiffness = 600f
-        ),
-        finishedListener = {
-            if (isPressed) {
-                isPressed = false
-            }
-        },
-        label = "bounce_animation"
-    )
+    // Performance optimization: Stable reference for onClick callback
+    val stableOnClick by rememberUpdatedState(onClick)
     
     LikeButton(
         isLiked = isLiked,
         likesCount = likesCount,
         isLoading = isLoading,
-        onClick = {
-            isPressed = true
-            onClick()
-        },
-        modifier = modifier.scale(bounceScale),
+        onClick = stableOnClick,
+        modifier = modifier,
         enabled = enabled,
-        showCount = showCount
+        showCount = showCount,
+        hasError = hasError
     )
 }
 
-@Preview(name = "Like Button - Unliked")
+@Preview(name = "Enhanced Like Button - Unliked")
 @Composable
-private fun LikeButtonUnlikedPreview() {
+private fun EnhancedLikeButtonUnlikedPreview() {
     ReciplanTheme {
         Surface {
             Column(
@@ -223,9 +267,9 @@ private fun LikeButtonUnlikedPreview() {
     }
 }
 
-@Preview(name = "Like Button - Liked")
+@Preview(name = "Enhanced Like Button - Liked")
 @Composable
-private fun LikeButtonLikedPreview() {
+private fun EnhancedLikeButtonLikedPreview() {
     ReciplanTheme {
         Surface {
             Column(
@@ -242,9 +286,29 @@ private fun LikeButtonLikedPreview() {
     }
 }
 
-@Preview(name = "Like Button - Loading")
+@Preview(name = "Enhanced Like Button - Error State")
 @Composable
-private fun LikeButtonLoadingPreview() {
+private fun EnhancedLikeButtonErrorPreview() {
+    ReciplanTheme {
+        Surface {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                LikeButton(
+                    isLiked = false,
+                    likesCount = 42,
+                    hasError = true,
+                    onClick = {}
+                )
+            }
+        }
+    }
+}
+
+@Preview(name = "Enhanced Like Button - Loading")
+@Composable
+private fun EnhancedLikeButtonLoadingPreview() {
     ReciplanTheme {
         Surface {
             Column(
@@ -262,30 +326,38 @@ private fun LikeButtonLoadingPreview() {
     }
 }
 
-@Preview(name = "Like Button - Variations")
+@Preview(name = "Enhanced Like Button - Comprehensive")
 @Composable
-private fun LikeButtonVariationsPreview() {
+private fun EnhancedLikeButtonComprehensivePreview() {
     ReciplanTheme {
         Surface {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("Regular Like Button")
+                Text("Enhanced Heart Scaling Animation")
                 LikeButton(
                     isLiked = false,
                     likesCount = 1247,
                     onClick = {}
                 )
                 
-                Text("Animated Like Button")
-                AnimatedLikeButton(
+                Text("Enhanced with Error State")
+                LikeButton(
                     isLiked = true,
                     likesCount = 1248,
+                    hasError = true,
                     onClick = {}
                 )
                 
-                Text("Without Count")
+                Text("Enhanced Animated Version")
+                EnhancedAnimatedLikeButton(
+                    isLiked = true,
+                    likesCount = 999,
+                    onClick = {}
+                )
+                
+                Text("Without Count - Enhanced")
                 LikeButton(
                     isLiked = true,
                     likesCount = 0,
@@ -293,11 +365,11 @@ private fun LikeButtonVariationsPreview() {
                     onClick = {}
                 )
                 
-                Text("Disabled")
+                Text("Loading State - Enhanced")
                 LikeButton(
                     isLiked = false,
                     likesCount = 42,
-                    enabled = false,
+                    isLoading = true,
                     onClick = {}
                 )
             }
@@ -305,9 +377,9 @@ private fun LikeButtonVariationsPreview() {
     }
 }
 
-@Preview(name = "Like Button - Dark Theme")
+@Preview(name = "Enhanced Like Button - Dark Theme")
 @Composable
-private fun LikeButtonDarkPreview() {
+private fun EnhancedLikeButtonDarkPreview() {
     ReciplanTheme(darkTheme = true) {
         Surface {
             Column(
@@ -322,6 +394,12 @@ private fun LikeButtonDarkPreview() {
                 LikeButton(
                     isLiked = true,
                     likesCount = 43,
+                    onClick = {}
+                )
+                LikeButton(
+                    isLiked = false,
+                    likesCount = 44,
+                    hasError = true,
                     onClick = {}
                 )
             }

@@ -12,7 +12,10 @@ import kotlinx.coroutines.flow.*
 
 data class HomeUiState(
     val isRefreshing: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val successMessage: String? = null,
+    val searchQuery: String = "",
+    val selectedFilter: String = "All"
 )
 
 class HomeViewModel(
@@ -118,6 +121,17 @@ class HomeViewModel(
     }
 
     /**
+     * Refresh the recipe feed when returning from create recipe
+     */
+    fun refreshAfterRecipeCreation() {
+        viewModelScope.launch {
+            // Small delay to ensure the recipe is saved on the server
+            kotlinx.coroutines.delay(500)
+            pagingRecipeRepository.invalidatePagingSource()
+        }
+    }
+
+    /**
      * Clear any error state
      */
     fun clearError() {
@@ -125,10 +139,35 @@ class HomeViewModel(
     }
 
     /**
+     * Clear success message
+     */
+    fun clearSuccessMessage() {
+        _uiState.value = _uiState.value.copy(successMessage = null)
+    }
+
+    /**
      * Set error state
      */
     private fun setError(message: String) {
         _uiState.value = _uiState.value.copy(error = message)
+    }
+
+    /**
+     * Search recipes
+     */
+    fun searchRecipes(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        // TODO: Implement search functionality with paging
+        // For now, we'll just update the state
+    }
+
+    /**
+     * Filter recipes by tag
+     */
+    fun filterRecipesByTag(tag: String) {
+        _uiState.value = _uiState.value.copy(selectedFilter = tag)
+        // TODO: Implement filter functionality with paging
+        // For now, we'll just update the state
     }
 
     /**
