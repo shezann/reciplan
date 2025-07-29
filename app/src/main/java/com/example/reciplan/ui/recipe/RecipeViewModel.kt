@@ -239,8 +239,12 @@ class RecipeViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true)
             recipeRepository.createRecipe(request).fold(
                 onSuccess = { recipe ->
-                    _recipeFeed.value = listOf(recipe) + _recipeFeed.value
-                    updateFilteredRecipes()
+                    println("🔧 RECIPE CREATED: '${recipe.title}' (ID: ${recipe.id}, UserID: ${recipe.userId})")
+                    println("🔧 CURRENT USER: ${getCurrentUserId()}")
+                    
+                    // Force refresh from server to ensure we get the latest data
+                    loadRecipes(refresh = true)
+                    
                     _uiState.value = _uiState.value.copy(isLoading = false, error = null, successMessage = "Recipe created successfully!")
                 },
                 onFailure = { error ->

@@ -9,37 +9,37 @@ import androidx.compose.ui.graphics.Color
  * Inspired by warm kitchen colors: Tomato, Basil, Cream, and Charcoal
  */
 object AppColors {
-    // Primary Colors - Tomato (accent/action color)
-    val Tomato = Color(0xFFFF5A5F)
-    val TomatoLight = Color(0xFFFF7B7F)
-    val TomatoDark = Color(0xFFE8524F)
+    // Primary Colors - Green (accent/action color)
+    val Tomato = Color(0xFF497D49)
+    val TomatoLight = Color(0xFF5A8F5A)
+    val TomatoDark = Color(0xFF3D6B3D)
     
-    // Secondary Colors - Basil (success/positive actions)
-    val Basil = Color(0xFF34C759)
-    val BasilLight = Color(0xFF48D167)
-    val BasilDark = Color(0xFF2E8B45)
+    // Secondary Colors - Sage (complementary to green)
+    val Basil = Color(0xFF8FBC8F)
+    val BasilLight = Color(0xFFA5C9A5)
+    val BasilDark = Color(0xFF7A9F7A)
     
-    // Background Colors - Cream (warm neutral backgrounds)
-    val Cream = Color(0xFFFFF8F2)
-    val CreamLight = Color(0xFFFFFBF8)
-    val CreamDark = Color(0xFF1A1612)
+    // Background Colors - Soft gradient backgrounds
+    val Cream = Color(0xFFF8FBF8)  // Very light mint green
+    val CreamLight = Color(0xFFFAFDFA)  // Lighter mint green
+    val CreamDark = Color(0xFF1A1F1A)  // Dark green-tinted background
     
-    // Text Colors - Charcoal (high contrast text)
-    val Charcoal = Color(0xFF333333)
-    val CharcoalLight = Color(0xFF4A4A4A)
-    val CharcoalDark = Color(0xFFE8E3DD)
+    // Text Colors - Green-tinted charcoal (high contrast text)
+    val Charcoal = Color(0xFF2A3F2A)  // Green-tinted dark text
+    val CharcoalLight = Color(0xFF4A5F4A)  // Green-tinted medium text
+    val CharcoalDark = Color(0xFFE8F0E8)  // Green-tinted light text
     
     // Surface Colors
     val SurfaceLight = Color(0xFFFFFF)
-    val SurfaceDark = Color(0xFF2A2420)
-    val SurfaceVariantLight = Color(0xFFF5F0EA)
-    val SurfaceVariantDark = Color(0xFF3A342E)
+    val SurfaceDark = Color(0xFF2A2F2A)
+    val SurfaceVariantLight = Color(0xFFF0F5F0)  // Very light green tint
+    val SurfaceVariantDark = Color(0xFF3A3F3A)  // Dark green tint
     
     // Outline Colors
-    val OutlineLight = Color(0xFF8A7F73)
-    val OutlineDark = Color(0xFF9A8F83)
-    val OutlineVariantLight = Color(0xFFBBB0A4)
-    val OutlineVariantDark = Color(0xFF6A5F53)
+    val OutlineLight = Color(0xFF7A8F7A)  // Green-tinted outline
+    val OutlineDark = Color(0xFF8A9F8A)  // Lighter green outline
+    val OutlineVariantLight = Color(0xFFB0C5B0)  // Very light green outline
+    val OutlineVariantDark = Color(0xFF5A6F5A)  // Darker green outline
     
     // Error Colors (keeping food theme with deeper red)
     val ErrorLight = Color(0xFFBA1A1A)
@@ -47,11 +47,11 @@ object AppColors {
     val ErrorContainerLight = Color(0xFFFFDAD6)
     val ErrorContainerDark = Color(0xFF93000A)
     
-    // Success Colors (using Basil variants)
-    val SuccessLight = Basil
-    val SuccessDark = BasilLight
-    val SuccessContainerLight = Color(0xFFD1F2EB)
-    val SuccessContainerDark = Color(0xFF0D4F21)
+    // Success Colors (using Green variants)
+    val SuccessLight = Tomato
+    val SuccessDark = TomatoLight
+    val SuccessContainerLight = Color(0xFFE8F5E8)
+    val SuccessContainerDark = Color(0xFF1A3D1A)
     
     // Warning Colors (using warm orange)
     val WarningLight = Color(0xFFB8860B)

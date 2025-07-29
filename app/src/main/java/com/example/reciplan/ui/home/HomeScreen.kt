@@ -7,15 +7,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +26,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -39,6 +41,9 @@ import com.example.reciplan.ui.components.*
 import com.example.reciplan.ui.components.EmptyStateType
 import com.example.reciplan.ui.recipe.RecipeCard
 import com.example.reciplan.ui.theme.*
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.example.reciplan.R
 
 // Performance optimizations
 import com.example.reciplan.ui.theme.PerformanceMonitor
@@ -65,10 +70,14 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val recipeFeed = viewModel.recipeFeed.collectAsLazyPagingItems()
     val listState = rememberLazyListState()
+    val hapticFeedback = LocalHapticFeedback.current
     
     // Animation states for staggered loading
     var isInitialLoad by remember { mutableStateOf(true) }
-    val pullToRefreshState = rememberPullToRefreshState()
+    
+    // Search and filter states - use ViewModel state
+    val searchQuery = uiState.searchQuery
+    val selectedFilter = uiState.selectedFilter
     
     // Startup state management
     var hasStartupCompleted by remember { mutableStateOf(false) }
@@ -114,85 +123,156 @@ fun HomeScreen(
         }
     }
     
-    Box(
+    // Auto-clear error messages after delay
+    LaunchedEffect(uiState.error) {
+        if (uiState.error != null) {
+            kotlinx.coroutines.delay(5000) // Clear error after 5 seconds
+            viewModel.clearError()
+        }
+    }
+    
+            // Auto-clear success messages after delay
+    LaunchedEffect(uiState.successMessage) {
+        if (uiState.successMessage != null) {
+            kotlinx.coroutines.delay(3000) // Clear success message after 3 seconds
+            viewModel.clearSuccessMessage()
+        }
+    }
+
+    // Refresh feed when screen becomes visible (e.g., returning from create recipe)
+    var hasRefreshed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!hasRefreshed) {
+            kotlinx.coroutines.delay(1000) // Small delay to ensure screen is loaded
+            viewModel.refreshAfterRecipeCreation()
+            hasRefreshed = true
+        }
+    }
+
+    
+
+    
+    
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surface,
-                        MaterialTheme.colorScheme.background
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Header - matching RecipeScreen design
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 2.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                // Title and Mascot
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Mascot
+                    Image(
+                        painter = painterResource(id = R.drawable.reciplan_mascot),
+                        contentDescription = "Reciplan Mascot",
+                        modifier = Modifier.size(40.dp)
+                    )
+                    
+                    Text(
+                        text = "Home",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { 
+                        viewModel.searchRecipes(it)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search recipes...") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search"
+                        )
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
-            )
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Enhanced Header with gradient background
-            EnhancedTopAppBar(
-                isRefreshing = uiState.isRefreshing,
-                onRefresh = { viewModel.refreshFeed() }
-            )
-            
-            // Enhanced Error Display
-            AnimatedVisibility(
-                visible = uiState.error != null
-            ) {
-                uiState.error?.let { error ->
-                    EnhancedErrorCard(
-                        error = error,
-                        onDismiss = { viewModel.clearError() }
-                    )
-                }
-            }
-            
-            // Enhanced Recipe Feed with branded pull-to-refresh
-            PullToRefreshBox(
-                state = pullToRefreshState,
-                isRefreshing = uiState.isRefreshing,
-                onRefresh = { viewModel.refreshFeed() },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
-                indicator = {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.primary,
-                                shape = CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (uiState.isRefreshing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Filter Chips
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    val filterOptions = listOf("All", "Breakfast", "Lunch", "Dinner", "Dessert", "Snack")
+                    
+                    items(filterOptions) { filter ->
+                        FilterChip(
+                            selected = selectedFilter == filter,
+                            onClick = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.filterRecipesByTag(filter)
+                            },
+                            label = { Text(filter) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                             )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Pull to refresh",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        )
                     }
                 }
-            ) {
-                EnhancedRecipeFeedContent(
-                    recipeFeed = recipeFeed,
-                    viewModel = viewModel,
-                    onRecipeClick = onRecipeClick,
-                    listState = listState,
-                    isInitialLoad = isInitialLoad,
-                    startupRetryCount = startupRetryCount,
-                    modifier = Modifier.fillMaxSize()
+            }
+        }
+        
+        // Error Display
+        AnimatedVisibility(
+            visible = uiState.error != null
+        ) {
+            uiState.error?.let { error ->
+                EnhancedErrorCard(
+                    error = error,
+                    onDismiss = { viewModel.clearError() }
                 )
             }
         }
+        
+        // Success Message Display
+        AnimatedVisibility(
+            visible = uiState.successMessage != null
+        ) {
+            uiState.successMessage?.let { message ->
+                EnhancedSuccessCard(
+                    message = message,
+                    onDismiss = { viewModel.clearSuccessMessage() }
+                )
+            }
+        }
+        
+        // Recipe Feed
+        EnhancedRecipeFeedContent(
+            recipeFeed = recipeFeed,
+            viewModel = viewModel,
+            onRecipeClick = onRecipeClick,
+            listState = listState,
+            isInitialLoad = isInitialLoad,
+            startupRetryCount = startupRetryCount,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 
@@ -201,14 +281,12 @@ fun HomeScreen(
  */
 @Composable
 private fun EnhancedTopAppBar(
-    isRefreshing: Boolean,
-    onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = if (isRefreshing) 8.dp else 4.dp
+        shadowElevation = 4.dp
     ) {
         Row(
             modifier = Modifier
@@ -232,36 +310,59 @@ private fun EnhancedTopAppBar(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
-            // Refresh indicator
-            val refreshScale by animateFloatAsState(
-                targetValue = if (isRefreshing) 0.8f else 1.0f,
-                animationSpec = MotionSpecs.standardSpring(),
-                label = "refresh_scale"
+        }
+    }
+}
+
+/**
+ * Enhanced success card with better styling and animations
+ */
+@Composable
+private fun EnhancedSuccessCard(
+    message: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cardScale by animateFloatAsState(
+        targetValue = 1.0f,
+        animationSpec = MotionSpecs.emphasizedSpring(),
+        label = "success_card_entrance"
+    )
+    
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .scale(cardScale),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        ),
+        shape = AppShapes.LargeShape,
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 6.dp
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
             )
             
-            IconButton(
-                onClick = onRefresh,
-                modifier = Modifier
-                    .scale(refreshScale)
-                    .background(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = CircleShape
-                    )
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             ) {
-                if (isRefreshing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh feed",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
+                Text("Dismiss")
             }
         }
     }
@@ -343,8 +444,8 @@ private fun EnhancedRecipeFeedContent(
         state = listState,
         modifier = modifier,
         contentPadding = PaddingValues(
-            horizontal = 16.dp,
-            vertical = 12.dp
+            horizontal = 4.dp,
+            vertical = 8.dp
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -584,12 +685,6 @@ private fun EnhancedPaginationErrorItem(
                 ),
                 shape = AppShapes.MediumShape
             ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
                 Text("Retry")
             }
         }

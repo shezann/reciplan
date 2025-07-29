@@ -44,6 +44,9 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
 import com.example.reciplan.R
 import com.example.reciplan.data.model.Recipe
@@ -310,17 +313,113 @@ private fun EnhancedImageGallery(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
-                        AsyncImage(
+                        SubcomposeAsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
-                        .data(images[page] ?: "https://via.placeholder.com/400x280/E0E0E0/757575?text=Recipe+Image")
+                                .data(images[page])
                                 .crossfade(true)
                                 .build(),
-                    contentDescription = "Recipe image ${page + 1} for ${recipe.title}",
+                            contentDescription = "Recipe image ${page + 1} for ${recipe.title}",
                             modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            error = painterResource(R.drawable.ic_launcher_foreground),
-                            placeholder = painterResource(R.drawable.ic_launcher_foreground)
-                        )
+                            contentScale = ContentScale.Crop
+                        ) {
+                            when (painter.state) {
+                                is AsyncImagePainter.State.Loading -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(32.dp),
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "Loading image...",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                                is AsyncImagePainter.State.Error -> {
+                                    // Friendly default image
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    colors = listOf(
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                                    )
+                                                )
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Star,
+                                                contentDescription = "Recipe",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(64.dp)
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "🍽️",
+                                                style = MaterialTheme.typography.headlineMedium,
+                                                modifier = Modifier.scale(1.5f)
+                                            )
+                                        }
+                                    }
+                                }
+                                is AsyncImagePainter.State.Success -> {
+                                    SubcomposeAsyncImageContent()
+                                }
+                                else -> {
+                                    // Default state when no image
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    colors = listOf(
+                                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
+                                                    )
+                                                )
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Star,
+                                                contentDescription = "Recipe",
+                                                tint = MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier.size(64.dp)
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "👨‍🍳",
+                                                style = MaterialTheme.typography.headlineMedium,
+                                                modifier = Modifier.scale(1.5f)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
             }
             
             // Image overlay gradient
@@ -437,7 +536,7 @@ private fun EnhancedRecipeMetadata(
                 color = MaterialTheme.colorScheme.secondary
             )
                             
-                            // Difficulty
+            // Difficulty
             EnhancedMetadataItem(
                 icon = Icons.Default.Star,
                 value = when (recipe.difficulty) {
@@ -451,11 +550,11 @@ private fun EnhancedRecipeMetadata(
                 customContent = {
                     Row {
                         repeat(recipe.difficulty) {
-                                        Icon(
-                                            imageVector = Icons.Default.Star,
-                                            contentDescription = null,
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(12.dp)
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.9f),
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
@@ -480,12 +579,12 @@ private fun EnhancedMetadataItem(
     ) {
         Surface(
             shape = CircleShape,
-            color = color.copy(alpha = 0.12f)
+            color = color.copy(alpha = 0.15f)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = color,
+                tint = color.copy(alpha = 0.9f),
                 modifier = Modifier.padding(8.dp)
             )
         }
@@ -498,16 +597,17 @@ private fun EnhancedMetadataItem(
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
         
-                                Text(
+        Text(
             text = label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 

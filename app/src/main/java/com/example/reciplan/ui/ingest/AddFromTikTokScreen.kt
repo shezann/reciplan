@@ -373,12 +373,12 @@ private fun EnhancedTikTokHeroSection(
                 .size(80.dp)
                 .scale(scale),
             shape = AppShapes.LargeShape,
-            color = MaterialTheme.colorScheme.primaryContainer
+            color = MaterialTheme.colorScheme.secondaryContainer
         ) {
             Icon(
                 imageVector = Icons.Default.PlayArrow,
                 contentDescription = "TikTok Videos",
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(20.dp)
@@ -631,8 +631,8 @@ private fun EnhancedHelpSection(
     Surface(
         modifier = modifier,
         shape = AppShapes.LargeShape,
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-        shadowElevation = 1.dp
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier.padding(20.dp)

@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,7 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.reciplan.data.model.Recipe
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+
 import androidx.compose.animation.core.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedVisibility
@@ -53,6 +52,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.example.reciplan.R
 
 // Import motion system for animations
 import com.example.reciplan.ui.theme.StaggeredMotion
@@ -107,6 +109,11 @@ fun RecipeScreen(
         }
     }
     
+    // Load recipes when screen first becomes visible
+    LaunchedEffect(Unit) {
+        viewModel.loadRecipes(refresh = true)
+    }
+    
     // Auto-clear messages after delay
     LaunchedEffect(uiState.error) {
         if (uiState.error != null) {
@@ -138,18 +145,30 @@ fun RecipeScreen(
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-                // Title and Add Button
+                // Title, Mascot and Add Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Recipes",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Mascot
+                        Image(
+                            painter = painterResource(id = R.drawable.reciplan_mascot),
+                            contentDescription = "Reciplan Mascot",
+                            modifier = Modifier.size(40.dp)
+                        )
+                        
+                        Text(
+                            text = "Recipes",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     
                     if (showCreateButton) {
                         Box {
@@ -301,7 +320,6 @@ fun RecipeScreen(
                             OutlinedButton(
                                 onClick = { 
                                     viewModel.clearError()
-                                    viewModel.refreshRecipes() 
                                 },
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = MaterialTheme.colorScheme.onErrorContainer
@@ -311,13 +329,7 @@ fun RecipeScreen(
                                     MaterialTheme.colorScheme.onErrorContainer
                                 )
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Retry")
+                                Text("Dismiss")
                             }
                             
                             TextButton(
@@ -359,10 +371,6 @@ fun RecipeScreen(
         }
         
         // Recipe Feed
-        PullToRefreshBox(
-            isRefreshing = uiState.isLoading,
-            onRefresh = { viewModel.refreshRecipes() }
-        ) {
             if (displayRecipes.isEmpty() && uiState.isLoading) {
                 // Enhanced initial loading state with emoji animation
                 EnhancedInitialLoadingState()
@@ -449,7 +457,6 @@ fun RecipeScreen(
                 }
             }
         }
-    }
     
     // Delete Confirmation Dialog
     if (showDeleteDialog && recipeToDelete != null) {
@@ -516,11 +523,6 @@ fun RecipeScreenDevelopment(
                     onClick = { viewModel.seedRecipes() }
                 ) {
                     Text("Seed Recipes")
-                }
-                Button(
-                    onClick = { viewModel.refreshRecipes() }
-                ) {
-                    Text("Refresh")
                 }
             }
         }

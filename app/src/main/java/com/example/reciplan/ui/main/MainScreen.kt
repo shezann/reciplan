@@ -44,9 +44,12 @@ fun MainScreen(
     viewModelFactory: ViewModelProvider.Factory,
     modifier: Modifier = Modifier
 ) {
+
     val bottomNavController = rememberNavController()
     val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    
+
     
     val bottomNavItems = listOf(
         BottomNavItem.Home,
